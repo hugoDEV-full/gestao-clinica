@@ -1,0 +1,405 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-bell"></i> Lembretes</h3>
+    <a href="/lembretes/novo" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Novo Lembrete
+    </a>
+</div>
+
+<!-- Estatísticas -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-warning bg-gradient text-white">
+                <i class="bi bi-clock"></i>
+            </div>
+            <h4 class="mb-1"><%= estatisticas.pendentes %></h4>
+            <p class="text-muted mb-0">Pendentes</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-success bg-gradient text-white">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <h4 class="mb-1"><%= estatisticas.enviados %></h4>
+            <p class="text-muted mb-0">Enviados</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-danger bg-gradient text-white">
+                <i class="bi bi-x-circle"></i>
+            </div>
+            <h4 class="mb-1"><%= estatisticas.falharam %></h4>
+            <p class="text-muted mb-0">Falharam</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-info bg-gradient text-white">
+                <i class="bi bi-bar-chart"></i>
+            </div>
+            <h4 class="mb-1"><%= estatisticas.total %></h4>
+            <p class="text-muted mb-0">Total</p>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="filtroStatus" class="form-label">Status</label>
+                <select class="form-select" id="filtroStatus" onchange="filtrarLembretes()">
+                    <option value="">Todos os Status</option>
+                    <option value="pendente">Pendentes</option>
+                    <option value="enviado">Enviados</option>
+                    <option value="erro">Falharam</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="filtroTipo" class="form-label">Tipo</label>
+                <select class="form-select" id="filtroTipo" onchange="filtrarLembretes()">
+                    <option value="">Todos os Tipos</option>
+                    <option value="consulta">Consulta</option>
+                    <option value="pagamento">Pagamento</option>
+                    <option value="exame">Exame</option>
+                    <option value="outro">Outro</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="buscaLembrete" class="form-label">Buscar</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="buscaLembrete" 
+                           placeholder="Buscar por paciente ou título..." oninput="filtrarLembretes()">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Lembretes -->
+<div class="card">
+    <div class="card-body">
+        <% if (lembretes.length > 0) { %>
+            <div class="table-responsive">
+                <table class="table table-hover" id="tabelaLembretes">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Paciente</th>
+                            <th>Profissional</th>
+                            <th>Tipo</th>
+                            <th>Título</th>
+                            <th>Status</th>
+                            <th>WhatsApp</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% lembretes.forEach(lembrete => { %>
+                        <tr data-status="<%= lembrete.status %>" data-tipo="<%= lembrete.tipo %>">
+                            <td>
+                                <div>
+                                    <i class="bi bi-calendar"></i> 
+                                    <%= moment(lembrete.data_envio).format('DD/MM/YYYY') %>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> 
+                                    <%= moment(lembrete.data_envio).format('HH:mm') %>
+                                </small>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                        <%= lembrete.paciente_nome ? lembrete.paciente_nome.charAt(0).toUpperCase() : '?' %>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold"><%= lembrete.paciente_nome || '-' %></div>
+                                        <% if (lembrete.paciente_telefone) { %>
+                                        <small class="text-muted"><%= lembrete.paciente_telefone %></small>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><%= lembrete.profissional_nome || '-' %></td>
+                            <td>
+                                <span class="badge bg-secondary">
+                                    <% const t = (lembrete.tipo || '').toLowerCase(); %>
+                                    <% const tipoIcon = t === 'consulta' ? 'bi-calendar-check' : (t === 'pagamento' ? 'bi-currency-dollar' : (t === 'exame' ? 'bi-image' : (t === 'medicamento' ? 'bi-capsule' : 'bi-bell'))); %>
+                                    <i class="bi <%= tipoIcon %>"></i> <%= lembrete.tipo %>
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-bold"><%= lembrete.titulo %></div>
+                                <% if (lembrete.mensagem && lembrete.mensagem.length > 50) { %>
+                                <small class="text-muted"><%= lembrete.mensagem.substring(0, 50) %>...</small>
+                                <% } %>
+                            </td>
+                            <td>
+                                <% const st = (lembrete.status || '').toLowerCase(); %>
+                                <% const statusBadge = st === 'enviado' ? 'bg-success' : (st === 'erro' ? 'bg-danger' : 'bg-warning'); %>
+                                <% const statusIcon = st === 'enviado' ? 'bi-check-circle' : (st === 'erro' ? 'bi-x-circle' : 'bi-clock'); %>
+                                <span class="badge <%= statusBadge %>">
+                                    <i class="bi <%= statusIcon %>"></i> <%= lembrete.status %>
+                                </span>
+                            </td>
+                            <td>
+                                <% if (lembrete.via_whatsapp) { %>
+                                <span class="text-success">
+                                    <i class="bi bi-whatsapp"></i> Sim
+                                </span>
+                                <% } else { %>
+                                <span class="text-muted">
+                                    <i class="bi bi-x-circle"></i> Não
+                                </span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-info" 
+                                            onclick="verLembrete(<%= lembrete.id %>)" title="Visualizar detalhes do lembrete: mensagem, tentativas e último erro.">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <a href="/lembretes/<%= lembrete.id %>/editar" 
+                                       class="btn btn-sm btn-outline-primary" title="Editar dados do lembrete (tipo, data/hora, título e mensagem).">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <% if (lembrete.status === 'pendente' && lembrete.via_whatsapp) { %>
+                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                            onclick="enviarLembrete(<%= lembrete.id %>)" title="Enviar agora pelo WhatsApp (usa a mensagem configurada neste lembrete).">
+                                        <i class="bi bi-send"></i>
+                                    </button>
+                                    <% } %>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                            onclick="excluirLembrete(<%= lembrete.id %>)" title="Excluir este lembrete do sistema (ação irreversível).">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <div class="text-center py-5">
+                <i class="bi bi-bell-slash fs-1 text-muted"></i>
+                <h5 class="text-muted mt-3">Nenhum lembrete encontrado</h5>
+                <p class="text-muted">Crie seu primeiro lembrete para começar a enviar notificações automáticas.</p>
+                <a href="/lembretes/novo" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Criar Lembrete
+                </a>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<!-- Modal de Visualização -->
+<div class="modal fade" id="modalVisualizacao" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes do Lembrete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="conteudoVisualizacao">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function getTipoIcon(tipo) {
+    const icons = {
+        'consulta': '<i class="bi bi-calendar-check"></i>',
+        'pagamento': '<i class="bi bi-currency-dollar"></i>',
+        'exame': '<i class="bi bi-image"></i>',
+        'outro': '<i class="bi bi-bell"></i>'
+    };
+    return icons[tipo] || '<i class="bi bi-bell"></i>';
+}
+
+function getStatusIcon(status) {
+    const icons = {
+        'pendente': '<i class="bi bi-clock"></i>',
+        'enviado': '<i class="bi bi-check-circle"></i>',
+        'erro': '<i class="bi bi-x-circle"></i>'
+    };
+    return icons[status] || '<i class="bi bi-question-circle"></i>';
+}
+
+function getStatusText(status) {
+    const texts = {
+        'pendente': 'Pendente',
+        'enviado': 'Enviado',
+        'erro': 'Falha'
+    };
+    return texts[status] || status;
+}
+
+function getStatusBadgeClass(status) {
+    const classes = {
+        'pendente': 'bg-warning',
+        'enviado': 'bg-success',
+        'erro': 'bg-danger'
+    };
+    return classes[status] || 'bg-secondary';
+}
+
+function filtrarLembretes() {
+    const status = document.getElementById('filtroStatus').value;
+    const tipo = document.getElementById('filtroTipo').value;
+    const busca = document.getElementById('buscaLembrete').value.toLowerCase();
+    const linhas = document.querySelectorAll('#tabelaLembretes tbody tr');
+    
+    linhas.forEach(linha => {
+        const statusLinha = linha.dataset.status;
+        const tipoLinha = linha.dataset.tipo;
+        const textoLinha = linha.textContent.toLowerCase();
+        
+        const correspondeStatus = !status || statusLinha === status;
+        const correspondeTipo = !tipo || tipoLinha === tipo;
+        const correspondeBusca = !busca || textoLinha.includes(busca);
+        
+        linha.style.display = correspondeStatus && correspondeTipo && correspondeBusca ? '' : 'none';
+    });
+}
+
+function verLembrete(id) {
+    // Implementar visualização completa do lembrete
+    const modal = new bootstrap.Modal(document.getElementById('modalVisualizacao'));
+    const conteudo = document.getElementById('conteudoVisualizacao');
+
+    conteudo.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    `;
+
+    modal.show();
+
+    fetch('/api/lembretes/' + id)
+        .then(r => r.json())
+        .then(data => {
+            if (!data || !data.success || !data.lembrete) {
+                throw new Error((data && data.message) ? data.message : 'Erro ao carregar lembrete');
+            }
+
+            const l = data.lembrete;
+            const st = (l.status || '').toLowerCase();
+
+            conteudo.innerHTML = `
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="text-muted">Paciente</div>
+                        <div class="fw-bold">${l.paciente_nome || '-'}</div>
+                        ${l.paciente_telefone ? `<div class="text-muted">${l.paciente_telefone}</div>` : ''}
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted">Profissional</div>
+                        <div class="fw-bold">${l.profissional_nome || '-'}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted">Tipo</div>
+                        <div class="fw-bold">${l.tipo || '-'}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted">Status</div>
+                        <div>${getStatusIcon(st)} ${getStatusText(st)}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted">Envio</div>
+                        <div class="fw-bold">${l.data_envio ? new Date(l.data_envio).toLocaleString() : '-'}</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="text-muted">Título</div>
+                        <div class="fw-bold">${l.titulo || '-'}</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="text-muted">Mensagem</div>
+                        <div class="border rounded p-2" style="white-space: pre-wrap;">${(l.mensagem || '').replace(/</g, '&lt;')}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted">Tentativas</div>
+                        <div class="fw-bold">${(l.tentativas != null) ? l.tentativas : 0}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted">Último erro</div>
+                        <div class="fw-bold">${l.ultimo_erro || '-'}</div>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(err => {
+            console.error(err);
+            conteudo.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    ${err.message || 'Erro ao carregar lembrete'}
+                </div>
+            `;
+        });
+}
+
+function enviarLembrete(id) {
+    if (confirm('Deseja enviar este lembrete agora?')) {
+        fetch('/lembretes/' + id + '/enviar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Lembrete enviado com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro ao enviar lembrete: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao enviar lembrete');
+        });
+    }
+}
+
+function excluirLembrete(id) {
+    if (confirm('Tem certeza que deseja excluir este lembrete?')) {
+        fetch('/lembretes/' + id + '/excluir', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Lembrete excluído com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro ao excluir lembrete: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao excluir lembrete');
+        });
+    }
+}
+</script>

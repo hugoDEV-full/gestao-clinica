@@ -1,0 +1,146 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-shield-check"></i> Auditoria</h3>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="/auditoria">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Buscar</label>
+                    <input type="text" class="form-control" name="q" value="<%= filtros && filtros.q ? filtros.q : '' %>" placeholder="Ex.: paciente, UPDATE, login...">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Ação</label>
+                    <select class="form-select" name="acao">
+                        <option value="" <%= (filtros && !filtros.acao) ? 'selected' : '' %>>Todas</option>
+                        <option value="LOGIN" <%= (filtros && filtros.acao === 'LOGIN') ? 'selected' : '' %>>LOGIN</option>
+                        <option value="LOGOUT" <%= (filtros && filtros.acao === 'LOGOUT') ? 'selected' : '' %>>LOGOUT</option>
+                        <option value="INSERT" <%= (filtros && filtros.acao === 'INSERT') ? 'selected' : '' %>>INSERT</option>
+                        <option value="UPDATE" <%= (filtros && filtros.acao === 'UPDATE') ? 'selected' : '' %>>UPDATE</option>
+                        <option value="DELETE" <%= (filtros && filtros.acao === 'DELETE') ? 'selected' : '' %>>DELETE</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tabela</label>
+                    <input type="text" class="form-control" name="tabela" value="<%= filtros && filtros.tabela ? filtros.tabela : '' %>" placeholder="Ex.: pacientes">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Limite</label>
+                    <select class="form-select" name="limit">
+                        <option value="100" <%= (filtros && String(filtros.limit) === '100') ? 'selected' : '' %>>100</option>
+                        <option value="200" <%= (!filtros || !filtros.limit || String(filtros.limit) === '200') ? 'selected' : '' %>>200</option>
+                        <option value="500" <%= (filtros && String(filtros.limit) === '500') ? 'selected' : '' %>>500</option>
+                        <option value="1000" <%= (filtros && String(filtros.limit) === '1000') ? 'selected' : '' %>>1000</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a href="/auditoria" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Limpar
+                    </a>
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <% if (logs && logs.length > 0) { %>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Usuário</th>
+                            <th>Ação</th>
+                            <th>Tabela</th>
+                            <th>Registro</th>
+                            <th>IP</th>
+                            <th>Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% logs.forEach(l => { %>
+                            <tr>
+                                <td>
+                                    <div class="fw-bold"><%= l.created_at ? new Date(l.created_at).toLocaleDateString('pt-BR') : '-' %></div>
+                                    <small class="text-muted"><%= l.created_at ? new Date(l.created_at).toLocaleTimeString('pt-BR') : '' %></small>
+                                </td>
+                                <td>
+                                    <div class="fw-bold"><%= l.usuario_nome || ('ID ' + l.usuario_id) %></div>
+                                    <small class="text-muted"><%= l.usuario_email || '' %></small>
+                                </td>
+                                <td><span class="badge bg-secondary"><%= l.acao %></span></td>
+                                <td><%= l.tabela_afetada || '-' %></td>
+                                <td><%= (l.registro_id != null) ? l.registro_id : '-' %></td>
+                                <td><%= l.ip_address || '-' %></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="verDetalhes(<%= l.id %>)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-shield-x fs-1"></i>
+                <h5 class="mt-3">Nenhum registro encontrado</h5>
+                <p class="mb-0">Ajuste os filtros ou realize ações no sistema para gerar logs.</p>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes do Log</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre class="mb-0" id="detalhesJson" style="white-space: pre-wrap;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const logs = <%- JSON.stringify(logs || []) %>;
+
+function verDetalhes(id) {
+    const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
+    const el = document.getElementById('detalhesJson');
+    const l = logs.find(x => Number(x.id) === Number(id));
+
+    if (!l) {
+        el.textContent = 'Registro não encontrado.';
+        modal.show();
+        return;
+    }
+
+    const payload = {
+        id: l.id,
+        created_at: l.created_at,
+        usuario_id: l.usuario_id,
+        usuario_nome: l.usuario_nome,
+        usuario_email: l.usuario_email,
+        acao: l.acao,
+        tabela_afetada: l.tabela_afetada,
+        registro_id: l.registro_id,
+        ip_address: l.ip_address,
+        dados_anteriores: l.dados_anteriores,
+        dados_novos: l.dados_novos
+    };
+
+    el.textContent = JSON.stringify(payload, null, 2);
+    modal.show();
+}
+</script>

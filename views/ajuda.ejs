@@ -1,0 +1,304 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-question-circle"></i> Ajuda e Suporte</h3>
+    <div class="input-group" style="max-width: 400px;">
+        <span class="input-group-text">
+            <i class="bi bi-search"></i>
+        </span>
+        <input type="text" class="form-control" placeholder="Buscar ajuda...">
+    </div>
+</div>
+
+<% const safeAppConfig = (typeof appConfig !== 'undefined' && appConfig) ? appConfig : {}; %>
+<% const suporteTelefone = safeAppConfig.CLINICA_TELEFONE ? safeAppConfig.CLINICA_TELEFONE : '(61) 9829-7648'; %>
+<% const suporteWhatsapp = safeAppConfig.WHATSAPP_NUMBER ? safeAppConfig.WHATSAPP_NUMBER : suporteTelefone; %>
+<% const suporteEmail = safeAppConfig.CLINICA_EMAIL ? safeAppConfig.CLINICA_EMAIL : 'suporte@clinica.com'; %>
+<% const agendaInicio = safeAppConfig.AGENDA_HORARIO_INICIO ? safeAppConfig.AGENDA_HORARIO_INICIO : '08:00'; %>
+<% const agendaFim = safeAppConfig.AGENDA_HORARIO_FIM ? safeAppConfig.AGENDA_HORARIO_FIM : '18:00'; %>
+
+<div class="row">
+    <!-- Seções de Ajuda -->
+    <div class="col-md-8">
+        <div class="accordion" id="ajudaAccordion">
+            <!-- Primeiros Passos -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingOne">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                        <i class="bi bi-play-circle"></i> Primeiros Passos
+                    </button>
+                </h2>
+                <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#ajudaAccordion">
+                    <div class="accordion-body">
+                        <h5>Bem-vindo ao Sistema de Gestão!</h5>
+                        <p>Siga este passo a passo para usar todas as funcionalidades disponíveis:</p>
+                        <ol>
+                            <li><strong>Entrar no sistema:</strong> acesse <strong>Login</strong> e entre com seu usuário e senha.</li>
+                            <li><strong>Dashboard:</strong> após o login, use o <strong>menu lateral</strong> para navegar pelos módulos.</li>
+                            <li><strong>Pacientes:</strong> vá em <strong>Pacientes</strong> \&gt; <strong>Novo Paciente</strong> para cadastrar, e use <strong>Editar</strong> / <strong>Excluir</strong> para manter os cadastros atualizados (a exclusão <strong>inativa</strong> o paciente).</li>
+                            <li><strong>Profissionais e Convênios:</strong> acesse <strong>Profissionais</strong> e <strong>Convênios</strong> para consultar os módulos disponíveis.</li>
+                            <li><strong>Agendamentos:</strong> vá em <strong>Agendamentos</strong> \&gt; <strong>Novo Agendamento</strong> para marcar atendimentos e acompanhe a lista.</li>
+                            <li><strong>Agenda (visão por dia):</strong> use <strong>Agenda</strong> para filtrar atendimentos por data, status e profissional.</li>
+                            <li><strong>Prontuários:</strong> em <strong>Pacientes</strong>, clique no ícone de prontuário para abrir o prontuário do paciente.</li>
+                            <li><strong>Lembretes:</strong> vá em <strong>Lembretes</strong> \&gt; <strong>Novo Lembrete</strong>, acompanhe status (pendente/enviado/erro), use <strong>Enviar agora</strong> (quando WhatsApp estiver conectado), <strong>Editar</strong>, <strong>Visualizar</strong> e <strong>Excluir</strong>.</li>
+                            <li><strong>WhatsApp:</strong> acesse <strong>WhatsApp</strong> para ver o status, gerar QR Code e testar envio. Administradores podem configurar o <strong>número de envio</strong>.</li>
+                            <li><strong>Financeiro:</strong> use <strong>Financeiro</strong> para visualizar resumo e lançamentos (quando cadastrados no banco).</li>
+                            <li><strong>Relatórios:</strong> acesse <strong>Relatórios</strong> para a tela do módulo (funções de gerar/exportar podem não estar disponíveis).</li>
+                            <li><strong>Configurações e Usuários (admin):</strong> administradores acessam <strong>Configurações</strong> e <strong>Usuários</strong> para administração do sistema.</li>
+                            <li><strong>Perfil:</strong> em <strong>Meu Perfil</strong>, confira os dados do usuário logado.</li>
+                        </ol>
+
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Dica: use o menu lateral para acessar os módulos do sistema.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Funcionalidades do Sistema -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingFuncionalidades">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFuncionalidades" aria-expanded="false" aria-controls="collapseFuncionalidades">
+                        <i class="bi bi-grid-3x3-gap"></i> Funcionalidades do Sistema
+                    </button>
+                </h2>
+                <div id="collapseFuncionalidades" class="accordion-collapse collapse" aria-labelledby="headingFuncionalidades" data-bs-parent="#ajudaAccordion">
+                    <div class="accordion-body">
+                        <p class="mb-3">Confira as principais funcionalidades disponíveis:</p>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <h6 class="mb-2"><i class="bi bi-people"></i> Cadastros e gestão</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Pacientes</strong>: cadastro, edição, inativação e consulta de dados</li>
+                                    <li><strong>Profissionais</strong>: acesso ao módulo de profissionais</li>
+                                    <li><strong>Convênios</strong>: acesso ao módulo de convênios</li>
+                                    <li><strong>Usuários (admin)</strong>: gestão de usuários do sistema</li>
+                                </ul>
+                            </div>
+
+                            <div class="col-md-6">
+                                <h6 class="mb-2"><i class="bi bi-calendar-check"></i> Agenda e atendimentos</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Agendamentos</strong>: criar e listar agendamentos</li>
+                                    <li><strong>Agenda</strong>: visualização por dia com filtros</li>
+                                    <li><strong>Prontuários</strong>: acesso ao prontuário do paciente</li>
+                                </ul>
+                            </div>
+
+                            <div class="col-md-6">
+                                <h6 class="mb-2"><i class="bi bi-bell"></i> Lembretes e comunicação</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Lembretes</strong>: criar, editar, visualizar, enviar agora e excluir</li>
+                                    <li><strong>WhatsApp</strong>: status, QR Code, iniciar/reconectar e teste de envio</li>
+                                </ul>
+                            </div>
+
+                            <div class="col-md-6">
+                                <h6 class="mb-2"><i class="bi bi-graph-up"></i> Financeiro e relatórios</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Financeiro</strong>: visualização de resumo e lançamentos</li>
+                                    <li><strong>Relatórios</strong>: acesso ao módulo (funções podem estar em desenvolvimento)</li>
+                                </ul>
+                            </div>
+
+                            <div class="col-md-12">
+                                <h6 class="mb-2"><i class="bi bi-gear"></i> Configurações e conta</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Configurações (admin)</strong>: página central de configurações</li>
+                                    <li><strong>Perfil</strong>: dados do usuário logado</li>
+                                    <li><strong>Ajuda</strong>: manual rápido e perguntas frequentes</li>
+                                    <li><strong>Auditoria (LGPD) (admin)</strong>: visualização do log de alterações em <code>/auditoria</code></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auditoria (LGPD) -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingAuditoria">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAuditoria" aria-expanded="false" aria-controls="collapseAuditoria">
+                        <i class="bi bi-shield-check"></i> Auditoria (LGPD)
+                    </button>
+                </h2>
+                <div id="collapseAuditoria" class="accordion-collapse collapse" aria-labelledby="headingAuditoria" data-bs-parent="#ajudaAccordion">
+                    <div class="accordion-body">
+                        <p>O sistema registra ações relevantes (principalmente operações de escrita) para fins de rastreabilidade e conformidade.</p>
+
+                        <h6 class="mb-2">Onde visualizar</h6>
+                        <ul>
+                            <li><strong>Rota</strong>: <code>GET /auditoria</code></li>
+                            <li><strong>Permissão</strong>: requer login e perfil <strong>admin</strong></li>
+                        </ul>
+
+                        <h6 class="mb-2">O que é registrado</h6>
+                        <ul>
+                            <li><strong>Usuário</strong> (quando disponível), <strong>ação</strong> (<code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>), <strong>tabela afetada</strong> e <strong>id do registro</strong></li>
+                            <li><strong>Dados anteriores/novos</strong> (podem ser sanitizados para minimizar dados sensíveis)</li>
+                            <li><strong>IP</strong> do cliente e <strong>data/hora</strong> (<code>created_at</code>)</li>
+                        </ul>
+
+                        <h6 class="mb-2">Filtros (querystring)</h6>
+                        <ul>
+                            <li><strong>Busca geral</strong>: <code>?q=termo</code></li>
+                            <li><strong>Ação</strong>: <code>?acao=UPDATE</code></li>
+                            <li><strong>Tabela</strong>: <code>?tabela=pacientes</code></li>
+                            <li><strong>Limite</strong>: <code>?limit=200</code> (mín. 50, máx. 1000)</li>
+                        </ul>
+
+                        <h6 class="mb-2">Troubleshooting</h6>
+                        <div class="alert alert-warning mb-0">
+                            <strong>Erro:</strong> <code>Unknown column 'l.created_at'</code><br>
+                            <strong>Causa:</strong> a tabela <code>logs_lgpd</code> foi criada anteriormente sem a coluna <code>created_at</code>.<br>
+                            <strong>Correção:</strong> adicionar a coluna <code>created_at</code> no banco (o sistema pode ajustar automaticamente ao abrir <code>/auditoria</code>).
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tutoriais -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingTwo">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                        <i class="bi bi-book"></i> Tutoriais em Vídeo
+                    </button>
+                </h2>
+                <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#ajudaAccordion">
+                    <div class="accordion-body">
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Esta seção é reservada para tutoriais. Atualmente, os vídeos não estão disponíveis dentro do sistema.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Perguntas Frequentes -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingThree">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                        <i class="bi bi-question-circle"></i> Perguntas Frequentes
+                    </button>
+                </h2>
+                <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#ajudaAccordion">
+                    <div class="accordion-body">
+                        <div class="faq-item mb-3">
+                            <h6><i class="bi bi-question-circle text-primary"></i> Como conectar o WhatsApp?</h6>
+                            <p>Acesse o menu <strong>WhatsApp</strong> e siga as instruções para exibir o QR Code. Escaneie com seu celular e aguarde o status ficar <strong>Conectado</strong>.</p>
+                        </div>
+                        <div class="faq-item mb-3">
+                            <h6><i class="bi bi-question-circle text-primary"></i> Como enviar lembretes pelo WhatsApp?</h6>
+                            <p>Crie um lembrete em <strong>Lembretes</strong> e marque a opção de envio por <strong>WhatsApp</strong>. Na lista, lembretes <strong>pendentes</strong> com WhatsApp habilitado exibem o botão <strong>Enviar</strong>. O WhatsApp precisa estar conectado.</p>
+                        </div>
+                        <div class="faq-item mb-3">
+                            <h6><i class="bi bi-question-circle text-primary"></i> Como excluir um paciente?</h6>
+                            <p>No menu <strong>Pacientes</strong>, use o botão de excluir. O paciente é <strong>inativado</strong> (não é removido definitivamente), preservando o histórico.</p>
+                        </div>
+                        <div class="faq-item mb-3">
+                            <h6><i class="bi bi-question-circle text-primary"></i> Como exportar relatórios?</h6>
+                            <p>O módulo <strong>Relatórios</strong> está disponível no menu, porém a geração/exportação pode não estar habilitada nesta versão.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual do Sistema -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingFour">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
+                        <i class="bi bi-file-text"></i> Manual do Sistema
+                    </button>
+                </h2>
+                <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour" data-bs-parent="#ajudaAccordion">
+                    <div class="accordion-body">
+                        <h6 class="mb-2">Navegação</h6>
+                        <ul>
+                            <li>Use o <strong>menu lateral</strong> para acessar os módulos.</li>
+                            <li>O botão de menu no mobile abre/fecha a navegação.</li>
+                        </ul>
+
+                        <h6 class="mb-2">Pacientes</h6>
+                        <ul>
+                            <li><strong>Novo Paciente</strong>: preencha os campos obrigatórios (Nome, CPF, Data de Nascimento, Sexo) e salve.</li>
+                            <li><strong>Edição</strong>: clique no ícone de lápis e atualize as informações.</li>
+                            <li><strong>Exclusão</strong>: a exclusão inativa o cadastro para preservar histórico.</li>
+                        </ul>
+
+                        <h6 class="mb-2">Agendamentos e Agenda</h6>
+                        <ul>
+                            <li><strong>Novo Agendamento</strong>: selecione paciente, profissional, data/hora, duração e tipo de consulta.</li>
+                            <li><strong>Agendamentos</strong>: a lista mostra os últimos agendamentos cadastrados.</li>
+                            <li><strong>Agenda</strong>: use os filtros (data/status/profissional) para visualizar os atendimentos.</li>
+                        </ul>
+
+                        <h6 class="mb-2">Lembretes</h6>
+                        <ul>
+                            <li><strong>Status</strong>: pendente / enviado / erro.</li>
+                            <li><strong>Enviar agora</strong>: disponível para lembretes pendentes via WhatsApp.</li>
+                            <li><strong>Visualizar</strong>: abre detalhes como mensagem, tentativas e último erro.</li>
+                        </ul>
+
+                        <h6 class="mb-2">WhatsApp</h6>
+                        <ul>
+                            <li>Acompanhe <strong>status de conexão</strong> e gere o <strong>QR Code</strong>.</li>
+                            <li>Use os botões de <strong>iniciar/reconectar</strong> quando necessário.</li>
+                            <li>Há opções de teste, como <strong>enviar mensagem teste</strong> e <strong>verificar número</strong>.</li>
+                        </ul>
+
+                        <h6 class="mb-2">Financeiro e Relatórios</h6>
+                        <ul>
+                            <li>Acesse os módulos de <strong>Financeiro</strong> e <strong>Relatórios</strong> pelo menu.</li>
+                            <li>Algumas ações (como gerar/exportar) podem não estar habilitadas nesta versão.</li>
+                        </ul>
+
+                        <h6 class="mb-2">Segurança e LGPD</h6>
+                        <ul class="mb-0">
+                            <li>O acesso é protegido por login e sessão.</li>
+                            <li>Operações relevantes podem ser registradas para auditoria (LGPD), com minimização de dados.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suporte Técnico -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-headset"></i> Suporte Técnico
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <i class="bi bi-telephone fs-1 text-primary"></i>
+                    <h6>Telefone</h6>
+                    <p class="fw-bold"><%= suporteTelefone %></p>
+                    <small class="text-muted">Seg a Sex, <%= agendaInicio %> às <%= agendaFim %></small>
+                </div>
+                
+                <div class="text-center mb-4">
+                    <i class="bi bi-whatsapp fs-1 text-success"></i>
+                    <h6>WhatsApp</h6>
+                    <p class="fw-bold"><%= suporteWhatsapp %></p>
+                    <small class="text-muted">Suporte rápido</small>
+                </div>
+                
+                <div class="text-center mb-4">
+                    <i class="bi bi-envelope fs-1 text-info"></i>
+                    <h6>Email</h6>
+                    <p class="fw-bold"><%= suporteEmail %></p>
+                    <small class="text-muted">Resposta em 24h</small>
+                </div>
+                
+                <div class="text-center">
+                    <i class="bi bi-chat-dots fs-1 text-warning"></i>
+                    <h6>Chat Online</h6>
+                    <small class="text-muted">Contato via telefone, WhatsApp ou email.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

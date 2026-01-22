@@ -1,0 +1,72 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-image"></i> Exames</h3>
+    <button type="button" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Novo Exame
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-list-ul"></i> Exames Registrados
+        </h5>
+        <div class="input-group" style="max-width: 300px;">
+            <span class="input-group-text">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control" placeholder="Buscar exame...">
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Paciente</th>
+                        <th>Tipo</th>
+                        <th>Descrição</th>
+                        <th>Resultado</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>15/01/2024</td>
+                        <td><strong>João Silva</strong></td>
+                        <td><span class="badge bg-primary">Raio-X</span></td>
+                        <td>Raio-X da coluna lombar</td>
+                        <td><span class="badge bg-warning">Pendente</span></td>
+                        <td>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-upload"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>14/01/2024</td>
+                        <td><strong>Maria Santos</strong></td>
+                        <td><span class="badge bg-success">Ressonância</span></td>
+                        <td>Ressonância magnética do ombro</td>
+                        <td><span class="badge bg-info">Concluído</span></td>
+                        <td>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

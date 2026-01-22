@@ -1,0 +1,177 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-people"></i> Pacientes</h3>
+    <a href="/pacientes/novo" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Novo Paciente
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <!-- Filtros e Busca -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="buscaPaciente" 
+                           placeholder="Buscar por nome, CPF ou telefone...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filtroStatus">
+                    <option value="">Todos os Status</option>
+                    <option value="ativo">Ativos</option>
+                    <option value="inativo">Inativos</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-outline-secondary" onclick="limparFiltros()">
+                    <i class="bi bi-arrow-clockwise"></i> Limpar
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabela de Pacientes -->
+        <div class="table-responsive">
+            <table class="table table-hover" id="tabelaPacientes">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>Telefone</th>
+                        <th>Data Nasc.</th>
+                        <th>Convênio</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% pacientes.forEach(paciente => { %>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                    <%= paciente.nome.charAt(0).toUpperCase() %>
+                                </div>
+                                <div>
+                                    <div class="fw-bold"><%= paciente.nome %></div>
+                                    <small class="text-muted"><%= paciente.email || '-' %></small>
+                                </div>
+                            </div>
+                        </td>
+                        <td><%= paciente.cpf %></td>
+                        <td><%= paciente.telefone || '-' %></td>
+                        <td><%= moment(paciente.data_nascimento).format('DD/MM/YYYY') %></td>
+                        <td><%= paciente.convenio || '-' %></td>
+                        <td>
+                            <span class="badge badge-status <%= paciente.ativo ? 'bg-success' : 'bg-danger' %>">
+                                <%= paciente.ativo ? 'Ativo' : 'Inativo' %>
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="/pacientes/<%= paciente.id %>/editar" 
+                                   class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar dados cadastrais do paciente (contato, convênio e informações gerais).">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="/prontuarios/paciente/<%= paciente.id %>" 
+                                   class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir prontuário do paciente: histórico clínico e evoluções.">
+                                    <i class="bi bi-file-medical"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-success" 
+                                        onclick="verAgendamentos('<%= paciente.id %>')" data-bs-toggle="tooltip" data-bs-placement="top" title="Ver agendamentos do paciente (consultas marcadas/realizadas).">
+                                    <i class="bi bi-calendar"></i>
+                                </button>
+                                <form action="/pacientes/<%= paciente.id %>/excluir" method="POST" 
+                                      style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este paciente?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir o cadastro do paciente (ação irreversível).">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+
+        <% if (pacientes.length === 0) { %>
+        <div class="text-center py-5">
+            <i class="bi bi-people fs-1 text-muted"></i>
+            <h5 class="text-muted mt-3">Nenhum paciente encontrado</h5>
+            <p class="text-muted">Cadastre seu primeiro paciente para começar.</p>
+            <a href="/pacientes/novo" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Cadastrar Paciente
+            </a>
+        </div>
+        <% } %>
+    </div>
+</div>
+
+<!-- Modal de Agendamentos -->
+<div class="modal fade" id="modalAgendamentos" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Agendamentos do Paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="conteudoAgendamentos">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function limparFiltros() {
+    document.getElementById('buscaPaciente').value = '';
+    document.getElementById('filtroStatus').value = '';
+    filtrarPacientes();
+}
+
+function filtrarPacientes() {
+    const busca = document.getElementById('buscaPaciente').value.toLowerCase();
+    const status = document.getElementById('filtroStatus').value;
+    const linhas = document.querySelectorAll('#tabelaPacientes tbody tr');
+    
+    linhas.forEach(linha => {
+        const nome = linha.cells[0].textContent.toLowerCase();
+        const cpf = linha.cells[1].textContent.toLowerCase();
+        const telefone = linha.cells[2].textContent.toLowerCase();
+        const statusLinha = linha.cells[5].textContent.toLowerCase();
+        
+        const correspondeBusca = nome.includes(busca) || cpf.includes(busca) || telefone.includes(busca);
+        const correspondeStatus = !status || statusLinha.includes(status.toLowerCase());
+        
+        linha.style.display = correspondeBusca && correspondeStatus ? '' : 'none';
+    });
+}
+
+function verAgendamentos(pacienteId) {
+    const modal = new bootstrap.Modal(document.getElementById('modalAgendamentos'));
+    const conteudo = document.getElementById('conteudoAgendamentos');
+    
+    // Simulação - na implementação real, buscaria via AJAX
+    conteudo.innerHTML = `
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> 
+            Funcionalidade em desenvolvimento. Em breve será possível visualizar os agendamentos do paciente.
+        </div>
+    `;
+    
+    modal.show();
+}
+
+// Event listeners
+document.getElementById('buscaPaciente').addEventListener('input', filtrarPacientes);
+document.getElementById('filtroStatus').addEventListener('change', filtrarPacientes);
+</script>

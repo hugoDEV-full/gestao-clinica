@@ -1,0 +1,256 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-speedometer2"></i> Dashboard</h3>
+    <div class="btn-group">
+        <button type="button" class="btn btn-outline-secondary">
+            <i class="bi bi-download"></i> Exportar
+        </button>
+        <button type="button" class="btn btn-outline-secondary">
+            <i class="bi bi-printer"></i> Imprimir
+        </button>
+    </div>
+</div>
+
+<!-- Cards de Estatísticas -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-primary bg-gradient text-white">
+                <i class="bi bi-people"></i>
+            </div>
+            <h4 class="mb-1"><%= estatisticas.totalPacientes || 0 %></h4>
+            <p class="text-muted mb-0">Total de Pacientes</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-success bg-gradient text-white">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <h4 class="mb-1"><%= estatisticas.consultasHoje || 0 %></h4>
+            <p class="text-muted mb-0">Consultas Hoje</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-info bg-gradient text-white">
+                <i class="bi bi-clock-history"></i>
+            </div>
+            <h4 class="mb-1"><%= estatisticas.proximasConsultas || 0 %></h4>
+            <p class="text-muted mb-0">Próximas Consultas</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon bg-warning bg-gradient text-white">
+                <i class="bi bi-currency-dollar"></i>
+            </div>
+            <h4 class="mb-1">R$ <%= (estatisticas.faturamentoMes || 0).toFixed(2).replace('.', ',') %></h4>
+            <p class="text-muted mb-0">Faturamento Mês</p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Gráfico de Consultas Semanais -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-graph-up"></i> Consultas na Semana
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="consultasChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Lembretes Pendentes -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-bell"></i> Lembretes
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="fw-bold">Pendentes</span>
+                    <span class="badge bg-warning"><%= lembretesPendentes || 0 %></span>
+                </div>
+                <div class="list-group list-group-flush">
+                    <% if (lembretesRecentes && lembretesRecentes.length > 0) { %>
+                        <% lembretesRecentes.slice(0, 3).forEach(lembrete => { %>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold"><%= lembrete.paciente_nome %></div>
+                                <small class="text-muted"><%= lembrete.titulo %></small>
+                            </div>
+                            <span class="badge bg-info"><%= moment(lembrete.data_envio).format('DD/MM') %></span>
+                        </div>
+                        <% }) %>
+                    <% } else { %>
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-bell-slash fs-3"></i>
+                            <p class="mb-0">Nenhum lembrete pendente</p>
+                        </div>
+                    <% } %>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="/lembretes" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Próximas Consultas -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar3"></i> Próximas Consultas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Profissional</th>
+                                <th>Data/Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (proximasConsultas && proximasConsultas.length > 0) { %>
+                                <% proximasConsultas.slice(0, 5).forEach(consulta => { %>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                                <%= consulta.paciente_nome.charAt(0).toUpperCase() %>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold"><%= consulta.paciente_nome %></div>
+                                                <small class="text-muted"><%= consulta.tipo_consulta || 'Consulta' %></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><%= consulta.profissional_nome || 'Não informado' %></td>
+                                    <td>
+                                        <div><%= moment(consulta.data_hora).format('DD/MM') %></div>
+                                        <small class="text-muted"><%= moment(consulta.data_hora).format('HH:mm') %></small>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">
+                                        <i class="bi bi-calendar-x"></i>
+                                        <p class="mb-0">Nenhuma consulta próxima</p>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Consultas Recentes -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock-history"></i> Consultas Recentes
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Profissional</th>
+                                <th>Data/Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (consultasRecentes && consultasRecentes.length > 0) { %>
+                                <% consultasRecentes.slice(0, 5).forEach(consulta => { %>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                                <%= consulta.paciente_nome.charAt(0).toUpperCase() %>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold"><%= consulta.paciente_nome %></div>
+                                                <small class="text-muted"><%= consulta.tipo_consulta || 'Consulta' %></small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><%= consulta.profissional_nome || 'Não informado' %></td>
+                                    <td>
+                                        <div><%= moment(consulta.data_hora).format('DD/MM') %></div>
+                                        <small class="text-muted"><%= moment(consulta.data_hora).format('HH:mm') %></small>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">
+                                        <i class="bi bi-clock-history"></i>
+                                        <p class="mb-0">Nenhuma consulta recente</p>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Gráfico de Consultas Semanais
+const ctx = document.getElementById('consultasChart');
+if (ctx) {
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'],
+            datasets: [{
+                label: 'Consultas',
+                data: [<%= (estatisticas.consultasSemana || []).join(', ') %>],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+</script>

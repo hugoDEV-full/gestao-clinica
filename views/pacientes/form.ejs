@@ -1,0 +1,311 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <i class="bi bi-<%= paciente ? 'pencil' : 'plus-circle' %>"></i> 
+        <%= paciente ? 'Editar' : 'Cadastrar' %> Paciente
+    </h3>
+    <a href="/pacientes" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <% } %>
+
+        <form action="<%= paciente ? '/pacientes/' + paciente.id + '/editar' : '/pacientes' %>" 
+              method="POST" novalidate>
+            
+            <!-- Dados Pessoais -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h5 class="border-bottom pb-2">
+                        <i class="bi bi-person"></i> Dados Pessoais
+                    </h5>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="nome" class="form-label">Nome Completo *</label>
+                    <input type="text" class="form-control" id="nome" name="nome" 
+                           value="<%= paciente ? paciente.nome : '' %>" required>
+                    <div class="invalid-feedback">
+                        Por favor, informe o nome completo.
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <label for="cpf" class="form-label">CPF *</label>
+                    <input type="text" class="form-control" id="cpf" name="cpf" 
+                           value="<%= paciente ? paciente.cpf : '' %>" required
+                           maxlength="14" placeholder="000.000.000-00">
+                    <div class="invalid-feedback">
+                        Por favor, informe um CPF válido.
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <label for="rg" class="form-label">RG</label>
+                    <input type="text" class="form-control" id="rg" name="rg" 
+                           value="<%= paciente ? paciente.rg : '' %>" 
+                           placeholder="00.000.000-0">
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <label for="data_nascimento" class="form-label">Data Nascimento *</label>
+                    <input type="date" class="form-control" id="data_nascimento" name="data_nascimento" 
+                           value="<%= paciente ? paciente.data_nascimento : '' %>" required>
+                    <div class="invalid-feedback">
+                        Por favor, informe a data de nascimento.
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <label for="sexo" class="form-label">Sexo *</label>
+                    <select class="form-select" id="sexo" name="sexo" required>
+                        <option value="">Selecione...</option>
+                        <option value="masculino" <%= paciente && paciente.sexo === 'masculino' ? 'selected' : '' %>>Masculino</option>
+                        <option value="feminino" <%= paciente && paciente.sexo === 'feminino' ? 'selected' : '' %>>Feminino</option>
+                        <option value="outro" <%= paciente && paciente.sexo === 'outro' ? 'selected' : '' %>>Outro</option>
+                    </select>
+                    <div class="invalid-feedback">
+                        Por favor, selecione o sexo.
+                    </div>
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <label for="telefone" class="form-label">Telefone</label>
+                    <input type="tel" class="form-control" id="telefone" name="telefone" 
+                           value="<%= paciente ? paciente.telefone : '' %>" 
+                           placeholder="(00) 00000-0000">
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <label for="email" class="form-label">E-mail</label>
+                    <input type="email" class="form-control" id="email" name="email" 
+                           value="<%= paciente ? paciente.email : '' %>" 
+                           placeholder="email@exemplo.com">
+                </div>
+            </div>
+
+            <!-- Endereço -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h5 class="border-bottom pb-2">
+                        <i class="bi bi-geo-alt"></i> Endereço
+                    </h5>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="endereco" class="form-label">Endereço</label>
+                    <input type="text" class="form-control" id="endereco" name="endereco" 
+                           value="<%= paciente ? paciente.endereco : '' %>" 
+                           placeholder="Rua, número, complemento">
+                </div>
+                
+                <div class="col-md-3 mb-3">
+                    <label for="cidade" class="form-label">Cidade</label>
+                    <input type="text" class="form-control" id="cidade" name="cidade" 
+                           value="<%= paciente ? paciente.cidade : '' %>" 
+                           placeholder="São Paulo">
+                </div>
+                
+                <div class="col-md-2 mb-3">
+                    <label for="estado" class="form-label">Estado</label>
+                    <select class="form-select" id="estado" name="estado">
+                        <option value="">UF</option>
+                        <option value="AC" <%= paciente && paciente.estado === 'AC' ? 'selected' : '' %>>AC</option>
+                        <option value="AL" <%= paciente && paciente.estado === 'AL' ? 'selected' : '' %>>AL</option>
+                        <option value="AP" <%= paciente && paciente.estado === 'AP' ? 'selected' : '' %>>AP</option>
+                        <option value="AM" <%= paciente && paciente.estado === 'AM' ? 'selected' : '' %>>AM</option>
+                        <option value="BA" <%= paciente && paciente.estado === 'BA' ? 'selected' : '' %>>BA</option>
+                        <option value="CE" <%= paciente && paciente.estado === 'CE' ? 'selected' : '' %>>CE</option>
+                        <option value="DF" <%= paciente && paciente.estado === 'DF' ? 'selected' : '' %>>DF</option>
+                        <option value="ES" <%= paciente && paciente.estado === 'ES' ? 'selected' : '' %>>ES</option>
+                        <option value="GO" <%= paciente && paciente.estado === 'GO' ? 'selected' : '' %>>GO</option>
+                        <option value="MA" <%= paciente && paciente.estado === 'MA' ? 'selected' : '' %>>MA</option>
+                        <option value="MT" <%= paciente && paciente.estado === 'MT' ? 'selected' : '' %>>MT</option>
+                        <option value="MS" <%= paciente && paciente.estado === 'MS' ? 'selected' : '' %>>MS</option>
+                        <option value="MG" <%= paciente && paciente.estado === 'MG' ? 'selected' : '' %>>MG</option>
+                        <option value="PA" <%= paciente && paciente.estado === 'PA' ? 'selected' : '' %>>PA</option>
+                        <option value="PB" <%= paciente && paciente.estado === 'PB' ? 'selected' : '' %>>PB</option>
+                        <option value="PR" <%= paciente && paciente.estado === 'PR' ? 'selected' : '' %>>PR</option>
+                        <option value="PE" <%= paciente && paciente.estado === 'PE' ? 'selected' : '' %>>PE</option>
+                        <option value="PI" <%= paciente && paciente.estado === 'PI' ? 'selected' : '' %>>PI</option>
+                        <option value="RJ" <%= paciente && paciente.estado === 'RJ' ? 'selected' : '' %>>RJ</option>
+                        <option value="RN" <%= paciente && paciente.estado === 'RN' ? 'selected' : '' %>>RN</option>
+                        <option value="RS" <%= paciente && paciente.estado === 'RS' ? 'selected' : '' %>>RS</option>
+                        <option value="RO" <%= paciente && paciente.estado === 'RO' ? 'selected' : '' %>>RO</option>
+                        <option value="RR" <%= paciente && paciente.estado === 'RR' ? 'selected' : '' %>>RR</option>
+                        <option value="SC" <%= paciente && paciente.estado === 'SC' ? 'selected' : '' %>>SC</option>
+                        <option value="SP" <%= paciente && paciente.estado === 'SP' ? 'selected' : '' %>>SP</option>
+                        <option value="SE" <%= paciente && paciente.estado === 'SE' ? 'selected' : '' %>>SE</option>
+                        <option value="TO" <%= paciente && paciente.estado === 'TO' ? 'selected' : '' %>>TO</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-1 mb-3">
+                    <label for="cep" class="form-label">CEP</label>
+                    <input type="text" class="form-control" id="cep" name="cep" 
+                           value="<%= paciente ? paciente.cep : '' %>" 
+                           placeholder="00000-000" maxlength="9">
+                </div>
+            </div>
+
+            <!-- Convênio -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h5 class="border-bottom pb-2">
+                        <i class="bi bi-card-text"></i> Convênio
+                    </h5>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <label for="convenio" class="form-label">Convênio</label>
+                    <input type="text" class="form-control" id="convenio" name="convenio" 
+                           value="<%= paciente ? paciente.convenio : '' %>" 
+                           placeholder="Nome do convênio">
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <label for="numero_convenio" class="form-label">Número da Carteira</label>
+                    <input type="text" class="form-control" id="numero_convenio" name="numero_convenio" 
+                           value="<%= paciente ? paciente.numero_convenio : '' %>" 
+                           placeholder="000000000000000">
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <label for="validade_convenio" class="form-label">Validade</label>
+                    <input type="date" class="form-control" id="validade_convenio" name="validade_convenio" 
+                           value="<%= paciente ? paciente.validade_convenio : '' %>">
+                </div>
+            </div>
+
+            <!-- Informações Médicas -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h5 class="border-bottom pb-2">
+                        <i class="bi bi-heart-pulse"></i> Informações Médicas
+                    </h5>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="alergias" class="form-label">Alergias</label>
+                    <textarea class="form-control" id="alergias" name="alergias" rows="3"><%= paciente ? paciente.alergias || '' : '' %></textarea>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="medicamentos" class="form-label">Medicamentos em Uso</label>
+                    <textarea class="form-control" id="medicamentos" name="medicamentos" rows="3"><%= paciente ? paciente.medicamentos || '' : '' %></textarea>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="historico_familiar" class="form-label">Histórico Familiar</label>
+                    <textarea class="form-control" id="historico_familiar" name="historico_familiar" rows="3"><%= paciente ? paciente.historico_familiar || '' : '' %></textarea>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="observacoes" class="form-label">Observações</label>
+                    <textarea class="form-control" id="observacoes" name="observacoes" rows="3"><%= paciente ? paciente.observacoes || '' : '' %></textarea>
+                </div>
+            </div>
+
+            <!-- Botões -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between">
+                        <a href="/pacientes" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <div>
+                            <button type="reset" class="btn btn-outline-warning me-2">
+                                <i class="bi bi-arrow-clockwise"></i> Limpar
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> 
+                                <%= paciente ? 'Atualizar' : 'Cadastrar' %> Paciente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Form validation
+(function() {
+    'use strict';
+    
+    const forms = document.querySelectorAll('.needs-validation');
+    
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            form.classList.add('was-validated');
+        }, false);
+    });
+})();
+
+// Máscaras de input
+document.addEventListener('DOMContentLoaded', function() {
+    // Máscara de CPF
+    const cpfInput = document.getElementById('cpf');
+    if (cpfInput) {
+        cpfInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            
+            if (value.length > 9) {
+                value = value.slice(0, 3) + '.' + value.slice(3, 6) + '.' + value.slice(6, 9) + '-' + value.slice(9);
+            } else if (value.length > 6) {
+                value = value.slice(0, 3) + '.' + value.slice(3, 6) + '.' + value.slice(6);
+            } else if (value.length > 3) {
+                value = value.slice(0, 3) + '.' + value.slice(3);
+            }
+            
+            e.target.value = value;
+        });
+    }
+    
+    // Máscara de Telefone
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput) {
+        telefoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            
+            if (value.length > 7) {
+                value = '(' + value.slice(0, 2) + ') ' + value.slice(2, 7) + '-' + value.slice(7);
+            } else if (value.length > 2) {
+                value = '(' + value.slice(0, 2) + ') ' + value.slice(2);
+            }
+            
+            e.target.value = value;
+        });
+    }
+    
+    // Máscara de CEP
+    const cepInput = document.getElementById('cep');
+    if (cepInput) {
+        cepInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 8) value = value.slice(0, 8);
+            
+            if (value.length > 5) {
+                value = value.slice(0, 5) + '-' + value.slice(5);
+            }
+            
+            e.target.value = value;
+        });
+    }
+});
+</script>

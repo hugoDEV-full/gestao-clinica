@@ -1,0 +1,596 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-gear"></i> Configurações</h3>
+    <button type="button" class="btn btn-primary" onclick="salvarConfiguracoes()">
+        <i class="bi bi-check-circle"></i> Salvar Alterações
+    </button>
+</div>
+
+<!-- Abas de Configurações -->
+<ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="geral-tab" data-bs-toggle="tab" data-bs-target="#geral" type="button" role="tab" aria-controls="geral" aria-selected="true">
+            <i class="bi bi-house"></i> Geral
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="whatsapp-tab" data-bs-toggle="tab" data-bs-target="#whatsapp" type="button" role="tab" aria-controls="whatsapp" aria-selected="false">
+            <i class="bi bi-whatsapp"></i> WhatsApp
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="lembretes-tab" data-bs-toggle="tab" data-bs-target="#lembretes" type="button" role="tab" aria-controls="lembretes" aria-selected="false">
+            <i class="bi bi-bell"></i> Lembretes
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda" type="button" role="tab" aria-controls="agenda" aria-selected="false">
+            <i class="bi bi-calendar3"></i> Agenda
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button" role="tab" aria-controls="backup" aria-selected="false">
+            <i class="bi bi-cloud-download"></i> Backup
+        </button>
+    </li>
+</ul>
+
+<!-- Conteúdo das Abas -->
+<div class="tab-content" id="configTabContent">
+    <!-- Aba Geral -->
+    <div class="tab-pane fade show active" id="geral" role="tabpanel" aria-labelledby="geral-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-house"></i> Configurações Gerais
+                </h5>
+            </div>
+            <div class="card-body">
+                <div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome da Clínica *</label>
+                            <input type="text" class="form-control" id="cfg_nome" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CNPJ</label>
+                            <input type="text" class="form-control" id="cfg_cnpj" placeholder="00.000.000/0000-00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Telefone Principal *</label>
+                            <input type="tel" class="form-control" id="cfg_telefone" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email Principal *</label>
+                            <input type="email" class="form-control" id="cfg_email" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Endereço</label>
+                            <input type="text" class="form-control" id="cfg_endereco" placeholder="Rua, número, complemento">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Cidade</label>
+                            <input type="text" class="form-control" id="cfg_cidade" placeholder="Brasília">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" id="cfg_estado">
+                                <option value="">UF</option>
+                                <option value="AC">AC</option>
+                                <option value="AL">AL</option>
+                                <option value="AP">AP</option>
+                                <option value="AM">AM</option>
+                                <option value="BA">BA</option>
+                                <option value="CE">CE</option>
+                                <option value="DF">DF</option>
+                                <option value="ES">ES</option>
+                                <option value="GO">GO</option>
+                                <option value="MA">MA</option>
+                                <option value="MT">MT</option>
+                                <option value="MS">MS</option>
+                                <option value="MG">MG</option>
+                                <option value="PA">PA</option>
+                                <option value="PB">PB</option>
+                                <option value="PR">PR</option>
+                                <option value="PE">PE</option>
+                                <option value="PI">PI</option>
+                                <option value="RJ">RJ</option>
+                                <option value="RN">RN</option>
+                                <option value="RS">RS</option>
+                                <option value="RO">RO</option>
+                                <option value="RR">RR</option>
+                                <option value="SC">SC</option>
+                                <option value="SP">SP</option>
+                                <option value="SE">SE</option>
+                                <option value="TO">TO</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CEP</label>
+                            <input type="text" class="form-control" id="cfg_cep" placeholder="00000-000">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Logo da Clínica</label>
+                            <form action="/configuracoes/logo" method="POST" enctype="multipart/form-data">
+                                <input type="file" class="form-control" name="logo" accept="image/*" required>
+                                <div class="d-flex justify-content-end mt-2">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-upload"></i> Enviar Logo
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_exibirLogo">
+                                <label class="form-check-label" for="cfg_exibirLogo">
+                                    Exibir logo nos relatórios
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_modoManutencao">
+                                <label class="form-check-label" for="cfg_modoManutencao">
+                                    Modo Manutenção (só administradores acessam)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba WhatsApp -->
+    <div class="tab-pane fade" id="whatsapp" role="tabpanel" aria-labelledby="whatsapp-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-whatsapp"></i> Configurações do WhatsApp
+                </h5>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Número WhatsApp *</label>
+                            <input type="text" class="form-control" id="cfg_whatsappNumber" required>
+                            <small class="form-text text-muted">Formato: 55DD9XXXXXXXXX</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <div class="form-control-plaintext">
+                                <span class="badge bg-secondary" data-whatsapp-status>Carregando...</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_whatsappAutoConfirmar">
+                                <label class="form-check-label" for="cfg_whatsappAutoConfirmar">
+                                    Confirmar agendamentos automaticamente
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_whatsappEnviarLembretes">
+                                <label class="form-check-label" for="cfg_whatsappEnviarLembretes">
+                                    Enviar lembretes automáticos
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Mensagem Padrão</label>
+                            <textarea class="form-control" rows="4" id="cfg_whatsappMensagemPadrao"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-outline-warning" onclick="configWhatsappReconectar()">
+                                <i class="bi bi-arrow-clockwise"></i> Reconectar WhatsApp
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="configWhatsappNovoQr()">
+                                <i class="bi bi-qr-code"></i> Gerar Novo QR Code
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="configWhatsappTeste()">
+                                <i class="bi bi-send"></i> Testar Envio
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba Lembretes -->
+    <div class="tab-pane fade" id="lembretes" role="tabpanel" aria-labelledby="lembretes-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-bell"></i> Configurações de Lembretes
+                </h5>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Antecedência Consultas (horas)</label>
+                            <input type="number" class="form-control" id="cfg_lembretesConsultasHoras" min="1" max="168">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Antecedência Pagamentos (dias)</label>
+                            <input type="number" class="form-control" id="cfg_lembretesPagamentosDias" min="1" max="30">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Horário de Envio</label>
+                            <input type="time" class="form-control" id="cfg_lembretesHorario">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Dias de Envio</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesDias_seg">
+                                <label class="form-check-label" for="cfg_lembretesDias_seg">Segunda</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesDias_ter">
+                                <label class="form-check-label" for="cfg_lembretesDias_ter">Terça</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesDias_qua">
+                                <label class="form-check-label" for="cfg_lembretesDias_qua">Quarta</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesDias_qui">
+                                <label class="form-check-label" for="cfg_lembretesDias_qui">Quinta</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesDias_sex">
+                                <label class="form-check-label" for="cfg_lembretesDias_sex">Sexta</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesDias_sab">
+                                <label class="form-check-label" for="cfg_lembretesDias_sab">Sábado</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesDias_dom">
+                                <label class="form-check-label" for="cfg_lembretesDias_dom">Domingo</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_lembretesRepetirFalha">
+                                <label class="form-check-label" for="cfg_lembretesRepetirFalha">
+                                    Repetir envio em caso de falha
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba Agenda -->
+    <div class="tab-pane fade" id="agenda" role="tabpanel" aria-labelledby="agenda-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar3"></i> Configurações da Agenda
+                </h5>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Horário Início Padrão</label>
+                            <input type="time" class="form-control" id="cfg_agendaInicio">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Horário Fim Padrão</label>
+                            <input type="time" class="form-control" id="cfg_agendaFim">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Duração Padrão (minutos)</label>
+                            <input type="number" class="form-control" id="cfg_agendaDuracao" min="15" max="240">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Intervalo entre Consultas (minutos)</label>
+                            <input type="number" class="form-control" id="cfg_agendaIntervalo" min="0" max="60">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Dias de Funcionamento</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaDias_seg">
+                                <label class="form-check-label" for="cfg_agendaDias_seg">Segunda</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaDias_ter">
+                                <label class="form-check-label" for="cfg_agendaDias_ter">Terça</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaDias_qua">
+                                <label class="form-check-label" for="cfg_agendaDias_qua">Quarta</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaDias_qui">
+                                <label class="form-check-label" for="cfg_agendaDias_qui">Quinta</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaDias_sex">
+                                <label class="form-check-label" for="cfg_agendaDias_sex">Sexta</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaDias_sab">
+                                <label class="form-check-label" for="cfg_agendaDias_sab">Sábado</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaDias_dom">
+                                <label class="form-check-label" for="cfg_agendaDias_dom">Domingo</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg_agendaBloquearFeriados">
+                                <label class="form-check-label" for="cfg_agendaBloquearFeriados">
+                                    Bloquear agendamentos em feriados
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba Backup -->
+    <div class="tab-pane fade" id="backup" role="tabpanel" aria-labelledby="backup-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-cloud-download"></i> Backup e Restauração
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6>Backup Automático</h6>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cfg_backupAuto">
+                            <label class="form-check-label" for="backupAuto">
+                                Habilitar backup automático
+                            </label>
+                        </div>
+                        <div class="mt-3">
+                            <label class="form-label">Frequência</label>
+                            <select class="form-select" id="cfg_backupFrequencia">
+                                <option value="daily">Diário</option>
+                                <option value="weekly">Semanal</option>
+                                <option value="monthly">Mensal</option>
+                            </select>
+                        </div>
+                        <div class="mt-3">
+                            <label class="form-label">Horário</label>
+                            <input type="time" class="form-control" id="cfg_backupHorario">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Backup Manual</h6>
+                        <a href="/configuracoes/backup/download" class="btn btn-primary w-100 mb-2">
+                            <i class="bi bi-download"></i> Fazer Backup Agora
+                        </a>
+                        <a href="/configuracoes/backup/download?format=zip" class="btn btn-outline-primary w-100 mb-2">
+                            <i class="bi bi-file-zip"></i> Baixar Backup (.zip)
+                        </a>
+                        <div class="mt-3">
+                            <label class="form-label">Último Backup</label>
+                            <div class="form-control-plaintext">
+                                <span id="cfg_backupUltimo">-</span>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label class="form-label">Tamanho do Último Backup</label>
+                            <div class="form-control-plaintext">
+                                <span id="cfg_backupTamanho">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <h6>Restauração</h6>
+                        <form class="input-group" action="/configuracoes/backup/restore" method="POST" enctype="multipart/form-data" onsubmit="return confirm('ATENÇÃO: a restauração pode sobrescrever dados. Tem certeza que deseja continuar?')">
+                            <input type="file" class="form-control" name="backupFile" accept=".sql,.zip" required>
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="bi bi-upload"></i> Restaurar Backup
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function carregarConfiguracoes() {
+    try {
+        const resp = await fetch('/api/configuracoes', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        const cfg = data.config || {};
+
+        const setVal = (id, v) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.value = v == null ? '' : String(v);
+        };
+        const setChk = (id, v, defaultVal = false) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (v == null) {
+                el.checked = !!defaultVal;
+            } else {
+                el.checked = String(v) === '1' || String(v).toLowerCase() === 'true';
+            }
+        };
+
+        setVal('cfg_nome', cfg.CLINICA_NOME);
+        setVal('cfg_cnpj', cfg.CLINICA_CNPJ);
+        setVal('cfg_telefone', cfg.CLINICA_TELEFONE);
+        setVal('cfg_email', cfg.CLINICA_EMAIL);
+        setVal('cfg_endereco', cfg.CLINICA_ENDERECO);
+        setVal('cfg_cidade', cfg.CLINICA_CIDADE);
+        setVal('cfg_estado', cfg.CLINICA_ESTADO);
+        setVal('cfg_cep', cfg.CLINICA_CEP);
+        setChk('cfg_exibirLogo', cfg.EXIBIR_LOGO_RELATORIOS, true);
+        setChk('cfg_modoManutencao', cfg.MODO_MANUTENCAO, false);
+
+        setVal('cfg_whatsappNumber', cfg.WHATSAPP_NUMBER);
+        setChk('cfg_whatsappAutoConfirmar', cfg.WHATSAPP_AUTO_CONFIRMAR, true);
+        setChk('cfg_whatsappEnviarLembretes', cfg.WHATSAPP_ENVIAR_LEMBRETES, true);
+        setVal('cfg_whatsappMensagemPadrao', cfg.WHATSAPP_MENSAGEM_PADRAO || 'Olá {nome}! Seu agendamento está confirmado para {data} às {hora}. Compareça com 15 minutos de antecedência.');
+
+        setVal('cfg_lembretesConsultasHoras', cfg.LEMBRETES_ANTECEDENCIA_CONSULTAS_HORAS || '24');
+        setVal('cfg_lembretesPagamentosDias', cfg.LEMBRETES_ANTECEDENCIA_PAGAMENTOS_DIAS || '7');
+        setVal('cfg_lembretesHorario', cfg.LEMBRETES_HORARIO_ENVIO || '08:00');
+        setChk('cfg_lembretesRepetirFalha', cfg.LEMBRETES_REPETIR_FALHA, true);
+        setChk('cfg_lembretesDias_seg', cfg.LEMBRETES_DIAS_SEG, true);
+        setChk('cfg_lembretesDias_ter', cfg.LEMBRETES_DIAS_TER, true);
+        setChk('cfg_lembretesDias_qua', cfg.LEMBRETES_DIAS_QUA, true);
+        setChk('cfg_lembretesDias_qui', cfg.LEMBRETES_DIAS_QUI, true);
+        setChk('cfg_lembretesDias_sex', cfg.LEMBRETES_DIAS_SEX, true);
+        setChk('cfg_lembretesDias_sab', cfg.LEMBRETES_DIAS_SAB, false);
+        setChk('cfg_lembretesDias_dom', cfg.LEMBRETES_DIAS_DOM, false);
+
+        setVal('cfg_agendaInicio', cfg.AGENDA_HORARIO_INICIO || '07:00');
+        setVal('cfg_agendaFim', cfg.AGENDA_HORARIO_FIM || '20:00');
+        setVal('cfg_agendaDuracao', cfg.AGENDA_DURACAO_PADRAO_MINUTOS || '30');
+        setVal('cfg_agendaIntervalo', cfg.AGENDA_INTERVALO_MINUTOS || '15');
+        setChk('cfg_agendaBloquearFeriados', cfg.AGENDA_BLOQUEAR_FERIADOS, true);
+        setChk('cfg_agendaDias_seg', cfg.AGENDA_DIAS_SEG, true);
+        setChk('cfg_agendaDias_ter', cfg.AGENDA_DIAS_TER, true);
+        setChk('cfg_agendaDias_qua', cfg.AGENDA_DIAS_QUA, true);
+        setChk('cfg_agendaDias_qui', cfg.AGENDA_DIAS_QUI, true);
+        setChk('cfg_agendaDias_sex', cfg.AGENDA_DIAS_SEX, true);
+        setChk('cfg_agendaDias_sab', cfg.AGENDA_DIAS_SAB, false);
+        setChk('cfg_agendaDias_dom', cfg.AGENDA_DIAS_DOM, false);
+
+        setChk('cfg_backupAuto', cfg.BACKUP_AUTO, true);
+        setVal('cfg_backupFrequencia', cfg.BACKUP_FREQUENCIA || 'daily');
+        setVal('cfg_backupHorario', cfg.BACKUP_HORARIO || '02:00');
+
+        const elUltimo = document.getElementById('cfg_backupUltimo');
+        const elTamanho = document.getElementById('cfg_backupTamanho');
+        if (elUltimo) elUltimo.textContent = cfg.BACKUP_LAST_AT ? String(cfg.BACKUP_LAST_AT) : '-';
+        if (elTamanho) elTamanho.textContent = cfg.BACKUP_LAST_SIZE ? String(cfg.BACKUP_LAST_SIZE) : '-';
+    } catch (e) {
+        console.error('Erro ao carregar configurações:', e);
+    }
+}
+
+async function salvarConfiguracoes() {
+    try {
+        const cfg = {
+            CLINICA_NOME: document.getElementById('cfg_nome')?.value || '',
+            CLINICA_CNPJ: document.getElementById('cfg_cnpj')?.value || '',
+            CLINICA_TELEFONE: document.getElementById('cfg_telefone')?.value || '',
+            CLINICA_EMAIL: document.getElementById('cfg_email')?.value || '',
+            CLINICA_ENDERECO: document.getElementById('cfg_endereco')?.value || '',
+            CLINICA_CIDADE: document.getElementById('cfg_cidade')?.value || '',
+            CLINICA_ESTADO: document.getElementById('cfg_estado')?.value || '',
+            CLINICA_CEP: document.getElementById('cfg_cep')?.value || '',
+            EXIBIR_LOGO_RELATORIOS: document.getElementById('cfg_exibirLogo')?.checked ? '1' : '0',
+            MODO_MANUTENCAO: document.getElementById('cfg_modoManutencao')?.checked ? '1' : '0',
+
+            WHATSAPP_NUMBER: document.getElementById('cfg_whatsappNumber')?.value || '',
+            WHATSAPP_AUTO_CONFIRMAR: document.getElementById('cfg_whatsappAutoConfirmar')?.checked ? '1' : '0',
+            WHATSAPP_ENVIAR_LEMBRETES: document.getElementById('cfg_whatsappEnviarLembretes')?.checked ? '1' : '0',
+            WHATSAPP_MENSAGEM_PADRAO: document.getElementById('cfg_whatsappMensagemPadrao')?.value || '',
+
+            LEMBRETES_ANTECEDENCIA_CONSULTAS_HORAS: document.getElementById('cfg_lembretesConsultasHoras')?.value || '24',
+            LEMBRETES_ANTECEDENCIA_PAGAMENTOS_DIAS: document.getElementById('cfg_lembretesPagamentosDias')?.value || '7',
+            LEMBRETES_HORARIO_ENVIO: document.getElementById('cfg_lembretesHorario')?.value || '08:00',
+            LEMBRETES_REPETIR_FALHA: document.getElementById('cfg_lembretesRepetirFalha')?.checked ? '1' : '0',
+            LEMBRETES_DIAS_SEG: document.getElementById('cfg_lembretesDias_seg')?.checked ? '1' : '0',
+            LEMBRETES_DIAS_TER: document.getElementById('cfg_lembretesDias_ter')?.checked ? '1' : '0',
+            LEMBRETES_DIAS_QUA: document.getElementById('cfg_lembretesDias_qua')?.checked ? '1' : '0',
+            LEMBRETES_DIAS_QUI: document.getElementById('cfg_lembretesDias_qui')?.checked ? '1' : '0',
+            LEMBRETES_DIAS_SEX: document.getElementById('cfg_lembretesDias_sex')?.checked ? '1' : '0',
+            LEMBRETES_DIAS_SAB: document.getElementById('cfg_lembretesDias_sab')?.checked ? '1' : '0',
+            LEMBRETES_DIAS_DOM: document.getElementById('cfg_lembretesDias_dom')?.checked ? '1' : '0',
+
+            AGENDA_HORARIO_INICIO: document.getElementById('cfg_agendaInicio')?.value || '07:00',
+            AGENDA_HORARIO_FIM: document.getElementById('cfg_agendaFim')?.value || '20:00',
+            AGENDA_DURACAO_PADRAO_MINUTOS: document.getElementById('cfg_agendaDuracao')?.value || '30',
+            AGENDA_INTERVALO_MINUTOS: document.getElementById('cfg_agendaIntervalo')?.value || '15',
+            AGENDA_BLOQUEAR_FERIADOS: document.getElementById('cfg_agendaBloquearFeriados')?.checked ? '1' : '0',
+            AGENDA_DIAS_SEG: document.getElementById('cfg_agendaDias_seg')?.checked ? '1' : '0',
+            AGENDA_DIAS_TER: document.getElementById('cfg_agendaDias_ter')?.checked ? '1' : '0',
+            AGENDA_DIAS_QUA: document.getElementById('cfg_agendaDias_qua')?.checked ? '1' : '0',
+            AGENDA_DIAS_QUI: document.getElementById('cfg_agendaDias_qui')?.checked ? '1' : '0',
+            AGENDA_DIAS_SEX: document.getElementById('cfg_agendaDias_sex')?.checked ? '1' : '0',
+            AGENDA_DIAS_SAB: document.getElementById('cfg_agendaDias_sab')?.checked ? '1' : '0',
+            AGENDA_DIAS_DOM: document.getElementById('cfg_agendaDias_dom')?.checked ? '1' : '0',
+
+            BACKUP_AUTO: document.getElementById('cfg_backupAuto')?.checked ? '1' : '0',
+            BACKUP_FREQUENCIA: document.getElementById('cfg_backupFrequencia')?.value || 'daily',
+            BACKUP_HORARIO: document.getElementById('cfg_backupHorario')?.value || '02:00'
+        };
+
+        const resp = await fetch('/api/configuracoes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ config: cfg })
+        });
+        const data = await resp.json();
+        if (data && data.success) {
+            if (window.app && window.app.utils && window.app.utils.showNotification) {
+                window.app.utils.showNotification('Configurações salvas com sucesso!', 'success');
+            }
+        } else {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : 'Erro ao salvar configurações';
+            if (window.app && window.app.utils && window.app.utils.showNotification) {
+                window.app.utils.showNotification(msg, 'danger');
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao salvar configurações:', e);
+        if (window.app && window.app.utils && window.app.utils.showNotification) {
+            window.app.utils.showNotification('Erro ao salvar configurações', 'danger');
+        }
+    }
+}
+
+async function configWhatsappReconectar() {
+    try {
+        await fetch('/api/whatsapp/reactivate-teste', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (window.app && window.app.whatsapp) {
+            setTimeout(window.app.whatsapp.checkStatus, 1500);
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function configWhatsappNovoQr() {
+    try {
+        await fetch('/api/whatsapp/qrcode-teste', { method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function configWhatsappTeste() {
+    try {
+        if (window.app && window.app.whatsapp) {
+            await window.app.whatsapp.sendTestMessage();
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    carregarConfiguracoes();
+});
+</script>

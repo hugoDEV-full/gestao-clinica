@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <% const safeAppConfig = (typeof appConfig !== 'undefined' && appConfig) ? appConfig : {}; %>
+  <title><%= (typeof title !== 'undefined' && title) ? title : (safeAppConfig.CLINICA_NOME ? safeAppConfig.CLINICA_NOME : 'Gestão Clínica') %></title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="/css/style.css" rel="stylesheet" />
+</head>
+<body>
+  <% const safeUser = (typeof usuario !== 'undefined') ? usuario : null; %>
+  <% const safeCurrentPage = (typeof currentPage !== 'undefined') ? currentPage : ''; %>
+  <% const isLogged = !!(safeUser && safeUser.nome); %>
+
+  <div id="globalLoading" class="global-loading d-none" aria-hidden="true">
+    <div class="global-loading__backdrop"></div>
+    <div class="global-loading__content">
+      <div class="spinner-border text-light" role="status" aria-label="Carregando"></div>
+      <div class="text-light mt-3 fw-semibold">Carregando...</div>
+    </div>
+  </div>
+
+  <% if (isLogged) { %>
+    <button class="btn btn-primary d-md-none position-fixed" style="top:12px; left:12px; z-index:1100" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebar" aria-labelledby="sidebarLabel">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="sidebarLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body p-0">
+        <%- include('../partials/sidebar', { currentPage: safeCurrentPage, usuario: safeUser }) %>
+      </div>
+    </div>
+
+    <div class="d-flex">
+      <aside class="d-none d-md-block" style="width:280px; min-height:100vh;">
+        <%- include('../partials/sidebar', { currentPage: safeCurrentPage, usuario: safeUser }) %>
+      </aside>
+
+      <main class="flex-grow-1" style="min-height:100vh; background:#f8f9fa;">
+        <div class="container-fluid py-4">
+          <% if (typeof success !== 'undefined' && success) { %>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+              <i class="bi bi-check-circle"></i> <%= success %>
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          <% } %>
+
+          <% if (typeof error !== 'undefined' && error) { %>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              <i class="bi bi-exclamation-triangle"></i> <%= error %>
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          <% } %>
+
+          <%- body %>
+        </div>
+      </main>
+    </div>
+  <% } else { %>
+    <%- body %>
+  <% } %>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

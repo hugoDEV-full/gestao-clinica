@@ -1,0 +1,78 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-file-earmark-text"></i> Relatórios Médicos</h3>
+    <button type="button" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Novo Relatório
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-list-ul"></i> Relatórios Médicos Registrados
+        </h5>
+        <div class="input-group" style="max-width: 300px;">
+            <span class="input-group-text">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control" placeholder="Buscar relatório...">
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Paciente</th>
+                        <th>Profissional</th>
+                        <th>Tipo</th>
+                        <th>Resumo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>15/01/2024</td>
+                        <td><strong>João Silva</strong></td>
+                        <td>Dr. André Ballejo</td>
+                        <td><span class="badge bg-primary">Evolução</span></td>
+                        <td>Progresso do tratamento após 10 sessões</td>
+                        <td>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-printer"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>14/01/2024</td>
+                        <td><strong>Maria Santos</strong></td>
+                        <td>Dra. Ana Silva</td>
+                        <td><span class="badge bg-success">Alta</span></td>
+                        <td>Alta do tratamento com orientações</td>
+                        <td>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-printer"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

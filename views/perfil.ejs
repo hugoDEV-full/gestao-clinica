@@ -1,0 +1,264 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-person-circle"></i> Meu Perfil</h3>
+    <div class="btn-group">
+        <button type="button" class="btn btn-outline-secondary">
+            <i class="bi bi-printer"></i> Imprimir
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <!-- Foto de Perfil -->
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="avatar-lg bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 120px; height: 120px;">
+                    <span style="font-size: 48px;"><%= usuario.nome.charAt(0).toUpperCase() %></span>
+                </div>
+                <h5><%= usuario.nome %></h5>
+                <p class="text-muted"><%= usuario.tipo %></p>
+                <p class="text-muted"><%= usuario.email %></p>
+                <hr>
+                <div class="text-start">
+                    <p><strong>CPF:</strong> <%= usuario.cpf || 'Não informado' %></p>
+                    <p><strong>Telefone:</strong> <%= usuario.telefone || 'Não informado' %></p>
+                    <p><strong>Último Acesso:</strong> <%= new Date().toLocaleString('pt-BR') %></p>
+                </div>
+                <hr>
+                <button type="button" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-camera"></i> Alterar Foto
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <!-- Formulário de Perfil -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-person-gear"></i> Dados Pessoais
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="perfilForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome Completo *</label>
+                            <input type="text" class="form-control" value="<%= usuario.nome %>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" value="<%= usuario.email %>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CPF</label>
+                            <input type="text" class="form-control" value="<%= usuario.cpf || '' %>" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Telefone</label>
+                            <input type="tel" class="form-control" value="<%= usuario.telefone || '' %>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data Nascimento</label>
+                            <input type="date" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Gênero</label>
+                            <select class="form-select">
+                                <option value="">Selecione...</option>
+                                <option value="masculino">Masculino</option>
+                                <option value="feminino">Feminino</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Endereço</label>
+                            <input type="text" class="form-control" placeholder="Rua, número, complemento">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Cidade</label>
+                            <input type="text" class="form-control" placeholder="Brasília">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select">
+                                <option value="DF" selected>Distrito Federal</option>
+                                <option value="GO">Goiás</option>
+                                <option value="MG">Minas Gerais</option>
+                                <option value="SP">São Paulo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">CEP</label>
+                            <input type="text" class="form-control" placeholder="00000-000">
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Segurança -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-shield-lock"></i> Segurança
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="segurancaForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Senha Atual</label>
+                            <input type="password" class="form-control" name="senha_atual">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nova Senha</label>
+                            <input type="password" class="form-control" name="nova_senha">
+                            <small class="form-text text-muted">Mínimo 6 caracteres</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Confirmar Nova Senha</label>
+                            <input type="password" class="form-control" name="confirmar_senha">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="alterarSenha">
+                                <label class="form-check-label" for="alterarSenha">
+                                    Alterar senha
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Preferências -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i> Preferências
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="preferenciasForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Idioma</label>
+                            <select class="form-select">
+                                <option value="pt-BR" selected>Português (Brasil)</option>
+                                <option value="en">English</option>
+                                <option value="es">Español</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fuso Horário</label>
+                            <select class="form-select">
+                                <option value="-3" selected>UTC-3 (Brasília)</option>
+                                <option value="-2">UTC-2 (Fernando de Noronha)</option>
+                                <option value="-4">UTC-4 (Manaus)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Formato de Data</label>
+                            <select class="form-select">
+                                <option value="DD/MM/YYYY" selected>DD/MM/YYYY</option>
+                                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Notificações</label>
+                            <select class="form-select">
+                                <option value="todas" selected>Todas as notificações</option>
+                                <option value="importantes">Apenas importantes</option>
+                                <option value="nenhuma">Desativar notificações</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="emailNotificacoes" checked>
+                                <label class="form-check-label" for="emailNotificacoes">
+                                    Receber notificações por email
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="whatsappNotificacoes" checked>
+                                <label class="form-check-label" for="whatsappNotificacoes">
+                                    Receber notificações por WhatsApp
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="modoEscuro">
+                                <label class="form-check-label" for="modoEscuro">
+                                    Modo escuro (em desenvolvimento)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Botões de Ação -->
+        <div class="d-flex justify-content-between mt-4">
+            <div>
+                <button type="button" class="btn btn-primary" onclick="salvarPerfil()">
+                    <i class="bi bi-check-circle"></i> Salvar Alterações
+                </button>
+                <button type="button" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-clockwise"></i> Cancelar
+                </button>
+            </div>
+            <div>
+                <button type="button" class="btn btn-outline-warning">
+                    <i class="bi bi-download"></i> Exportar Meus Dados
+                </button>
+                <button type="button" class="btn btn-outline-danger">
+                    <i class="bi bi-box-arrow-right"></i> Sair
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function salvarPerfil() {
+    // Simulação de salvamento
+    alert('Perfil atualizado com sucesso!');
+}
+
+function alterarSenha() {
+    const checkbox = document.getElementById('alterarSenha');
+    const senhaAtual = document.querySelector('input[name="senha_atual"]');
+    const novaSenha = document.querySelector('input[name="nova_senha"]');
+    const confirmarSenha = document.querySelector('input[name="confirmar_senha"]');
+    
+    if (checkbox.checked) {
+        senhaAtual.disabled = false;
+        novaSenha.disabled = false;
+        confirmarSenha.disabled = false;
+        senhaAtual.required = true;
+        novaSenha.required = true;
+        confirmarSenha.required = true;
+    } else {
+        senhaAtual.disabled = true;
+        novaSenha.disabled = true;
+        confirmarSenha.disabled = true;
+        senhaAtual.required = false;
+        novaSenha.required = false;
+        confirmarSenha.required = false;
+        senhaAtual.value = '';
+        novaSenha.value = '';
+        confirmarSenha.value = '';
+    }
+}
+
+document.getElementById('alterarSenha').addEventListener('change', alterarSenha);
+</script>

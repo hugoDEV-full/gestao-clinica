@@ -1,0 +1,102 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <i class="bi bi-bell"></i>
+        <%= lembrete ? 'Editar Lembrete' : 'Novo Lembrete' %>
+    </h3>
+    <a href="/lembretes" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<% if (error) { %>
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle"></i> <%= error %>
+</div>
+<% } %>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST" action="<%= lembrete ? ('/lembretes/' + lembrete.id + '/editar') : '/lembretes' %>">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Paciente</label>
+                    <select class="form-select" name="paciente_id" required>
+                        <option value="">Selecione...</option>
+                        <% (pacientes || []).forEach(p => { %>
+                            <option value="<%= p.id %>" <%= (lembrete && Number(lembrete.paciente_id) === Number(p.id)) ? 'selected' : '' %>>
+                                <%= p.nome %> <%= p.cpf ? ('- CPF: ' + p.cpf) : '' %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Profissional</label>
+                    <select class="form-select" name="profissional_id">
+                        <option value="">(Opcional)</option>
+                        <% (profissionais || []).forEach(p => { %>
+                            <option value="<%= p.id %>" <%= (lembrete && lembrete.profissional_id != null && Number(lembrete.profissional_id) === Number(p.id)) ? 'selected' : '' %>>
+                                <%= p.nome %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select" name="tipo" required>
+                        <% const tipoAtual = (lembrete && lembrete.tipo) ? String(lembrete.tipo).toLowerCase() : 'consulta'; %>
+                        <option value="consulta" <%= tipoAtual === 'consulta' ? 'selected' : '' %>>Consulta</option>
+                        <option value="pagamento" <%= tipoAtual === 'pagamento' ? 'selected' : '' %>>Pagamento</option>
+                        <option value="exame" <%= tipoAtual === 'exame' ? 'selected' : '' %>>Exame</option>
+                        <option value="outro" <%= tipoAtual === 'outro' ? 'selected' : '' %>>Outro</option>
+                    </select>
+                </div>
+
+                <div class="col-md-8">
+                    <label class="form-label">Título</label>
+                    <input class="form-control" name="titulo" required maxlength="255" value="<%= lembrete ? lembrete.titulo : '' %>" />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Mensagem</label>
+                    <textarea class="form-control" name="mensagem" rows="5" required><%= lembrete ? lembrete.mensagem : '' %></textarea>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Data/Hora de envio</label>
+                    <% const dt = lembrete && lembrete.data_envio ? moment(lembrete.data_envio).format('YYYY-MM-DDTHH:mm') : moment().add(5, 'minutes').format('YYYY-MM-DDTHH:mm'); %>
+                    <input type="datetime-local" class="form-control" name="data_envio" required value="<%= dt %>" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Status</label>
+                    <% const st = (lembrete && lembrete.status) ? String(lembrete.status).toLowerCase() : 'pendente'; %>
+                    <select class="form-select" name="status">
+                        <option value="pendente" <%= st === 'pendente' ? 'selected' : '' %>>Pendente</option>
+                        <option value="enviado" <%= st === 'enviado' ? 'selected' : '' %>>Enviado</option>
+                        <option value="erro" <%= st === 'erro' ? 'selected' : '' %>>Erro</option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="via_whatsapp" name="via_whatsapp" value="1" <%= (lembrete && lembrete.via_whatsapp) ? 'checked' : (!lembrete ? 'checked' : '') %> />
+                        <label class="form-check-label" for="via_whatsapp">Enviar via WhatsApp</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="via_email" name="via_email" value="1" <%= (lembrete && lembrete.via_email) ? 'checked' : '' %> />
+                        <label class="form-check-label" for="via_email">Enviar via Email</label>
+                    </div>
+                </div>
+
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a href="/lembretes" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

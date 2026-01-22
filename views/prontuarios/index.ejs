@@ -1,0 +1,405 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-file-medical"></i> Prontuários</h3>
+    <div class="btn-group">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProntuario" onclick="novoProntuario()" data-bs-placement="bottom" title="Criar um novo prontuário para registrar o atendimento e o plano de tratamento.">
+            <i class="bi bi-plus-circle"></i> Novo Prontuário
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('formFiltrosProntuarios')?.scrollIntoView({behavior:'smooth'})" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Ir para os filtros de busca (paciente, profissional e período).">
+            <i class="bi bi-search"></i> Buscar
+        </button>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="/prontuarios" id="formFiltrosProntuarios">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Paciente</label>
+                <select class="form-select" name="paciente_id">
+                    <option value="">Todos os pacientes</option>
+                    <% if (typeof pacientes !== 'undefined' && pacientes && pacientes.length) { %>
+                        <% pacientes.forEach(p => { %>
+                            <option value="<%= p.id %>" <%= (filtros && filtros.paciente_id && String(filtros.paciente_id) === String(p.id)) ? 'selected' : '' %>><%= p.nome %><%= p.cpf ? ' - ' + p.cpf : '' %></option>
+                        <% }) %>
+                    <% } %>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Profissional</label>
+                <select class="form-select" name="profissional_id">
+                    <option value="">Todos os profissionais</option>
+                    <% if (typeof profissionais !== 'undefined' && profissionais && profissionais.length) { %>
+                        <% profissionais.forEach(p => { %>
+                            <option value="<%= p.id %>" <%= (filtros && filtros.profissional_id && String(filtros.profissional_id) === String(p.id)) ? 'selected' : '' %>><%= p.nome %></option>
+                        <% }) %>
+                    <% } %>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Período</label>
+                <select class="form-select" name="periodo">
+                    <option value="">Todos os períodos</option>
+                    <option value="7" <%= (filtros && filtros.periodo === '7') ? 'selected' : '' %>>Últimos 7 dias</option>
+                    <option value="30" <%= (filtros && filtros.periodo === '30') ? 'selected' : '' %>>Últimos 30 dias</option>
+                    <option value="90" <%= (filtros && filtros.periodo === '90') ? 'selected' : '' %>>Últimos 90 dias</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-outline-secondary w-100" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Aplicar os filtros selecionados e atualizar a lista de prontuários.">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+            </div>
+        </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Prontuários -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-list-ul"></i> Prontuários Recentes
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Paciente</th>
+                        <th>Profissional</th>
+                        <th>Tipo Atendimento</th>
+                        <th>Diagnóstico</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (typeof prontuarios !== 'undefined' && prontuarios && prontuarios.length) { %>
+                        <% prontuarios.forEach(p => { %>
+                            <% const st = (p.status || '').toLowerCase(); %>
+                            <% const badge = (st === 'concluido' || st === 'concluído') ? 'bg-secondary' : (st === 'cancelado' ? 'bg-danger' : 'bg-success'); %>
+                            <tr>
+                                <td><%= moment(p.data_atendimento).format('DD/MM/YYYY') %></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                            <%= (p.paciente_nome || 'P').charAt(0).toUpperCase() %>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold"><%= p.paciente_nome || 'Não informado' %></div>
+                                            <small class="text-muted">CPF: <%= p.paciente_cpf || 'Não informado' %></small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><%= p.profissional_nome || 'Não informado' %></td>
+                                <td><span class="badge bg-info"><%= p.tipo_atendimento || 'Atendimento' %></span></td>
+                                <td><%= p.diagnostico ? String(p.diagnostico).slice(0, 60) : '-' %></td>
+                                <td><span class="badge <%= badge %>"><%= p.status || 'em_andamento' %></span></td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Visualizar detalhes do prontuário e as evoluções registradas." onclick="visualizarProntuario('<%= p.id %>')">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar informações clínicas deste atendimento (diagnóstico, plano, observações, etc.)." onclick="editarProntuario('<%= p.id %>')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Adicionar evolução: registrar acompanhamento/observação após o atendimento." onclick="abrirEvolucao('<%= p.id %>')">
+                                            <i class="bi bi-plus-circle"></i>
+                                        </button>
+                                        <a class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Imprimir/gerar versão para papel (abre em nova aba)." href="/prontuarios/<%= p.id %>/imprimir" target="_blank">
+                                            <i class="bi bi-printer"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    <% } else { %>
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">Nenhum prontuário encontrado</td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Novo Prontuário -->
+<div class="modal fade" id="modalProntuario" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Prontuário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="/prontuarios" id="formProntuario">
+                    <input type="hidden" name="id" id="prontuario_id">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Paciente *</label>
+                            <select class="form-select" required name="paciente_id" id="prontuario_paciente_id">
+                                <option value="">Selecione...</option>
+                                <% if (typeof pacientes !== 'undefined' && pacientes && pacientes.length) { %>
+                                    <% pacientes.forEach(p => { %>
+                                        <option value="<%= p.id %>"><%= p.nome %><%= p.cpf ? ' - ' + p.cpf : '' %></option>
+                                    <% }) %>
+                                <% } %>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Data Atendimento *</label>
+                            <input type="date" class="form-control" required name="data_atendimento" id="prontuario_data_atendimento">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Profissional *</label>
+                            <select class="form-select" required name="profissional_id" id="prontuario_profissional_id">
+                                <option value="">Selecione...</option>
+                                <% if (typeof profissionais !== 'undefined' && profissionais && profissionais.length) { %>
+                                    <% profissionais.forEach(p => { %>
+                                        <option value="<%= p.id %>"><%= p.nome %></option>
+                                    <% }) %>
+                                <% } %>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tipo Atendimento *</label>
+                            <select class="form-select" required name="tipo_atendimento" id="prontuario_tipo_atendimento">
+                                <option value="">Selecione...</option>
+                                <option value="avaliacao">Avaliação</option>
+                                <option value="fisioterapia">Fisioterapia</option>
+                                <option value="osteopatia">Osteopatia</option>
+                                <option value="pilates">Pilates</option>
+                                <option value="reavaliacao">Reavaliação</option>
+                                <option value="alta">Alta</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Queixa Principal *</label>
+                            <input type="text" class="form-control" placeholder="Descreva a queixa principal..." required name="queixa_principal" id="prontuario_queixa_principal">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">História da Doença Atual *</label>
+                            <textarea class="form-control" rows="4" placeholder="Descreva a história da doença atual..." required name="historia_doenca" id="prontuario_historia_doenca"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">História Patológica Pregressa</label>
+                            <textarea class="form-control" rows="3" placeholder="Doças anteriores, cirurgias, etc..." name="historia_patologica" id="prontuario_historia_patologica"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">História Fisiológica</label>
+                            <textarea class="form-control" rows="3" placeholder="Hábitos de vida, atividades físicas, etc..." name="historia_fisiologica" id="prontuario_historia_fisiologica"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Exame Físico</label>
+                            <textarea class="form-control" rows="4" placeholder="Resultados do exame físico..." name="exame_fisico" id="prontuario_exame_fisico"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Diagnóstico *</label>
+                            <textarea class="form-control" rows="4" placeholder="Diagnóstico clínico..." required name="diagnostico" id="prontuario_diagnostico"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Plano de Tratamento *</label>
+                            <textarea class="form-control" rows="4" placeholder="Plano de tratamento proposto..." required name="plano_tratamento" id="prontuario_plano_tratamento"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Prognóstico</label>
+                            <textarea class="form-control" rows="3" placeholder="Prognóstico do paciente..." name="prognostico" id="prontuario_prognostico"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" rows="3" placeholder="Observações adicionais..." name="observacoes" id="prontuario_observacoes"></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status" id="prontuario_status">
+                                <option value="em_andamento">Em andamento</option>
+                                <option value="concluido">Concluído</option>
+                                <option value="cancelado">Cancelado</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary" form="formProntuario">Salvar Prontuário</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Visualizar -->
+<div class="modal fade" id="modalVisualizarProntuario" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Prontuário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="conteudoProntuario" class="text-muted">Carregando...</div>
+                <hr />
+                <h6>Evoluções</h6>
+                <div id="conteudoEvolucoes" class="text-muted">Carregando...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Evolução -->
+<div class="modal fade" id="modalEvolucao" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Evolução</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="evolucao_prontuario_id" />
+                <label class="form-label">Evolução</label>
+                <textarea class="form-control" rows="5" id="evolucao_texto" placeholder="Digite a evolução..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarEvolucao()">Salvar Evolução</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function novoProntuario() {
+    document.getElementById('prontuario_id').value = '';
+    document.getElementById('formProntuario').reset();
+}
+
+async function carregarProntuario(id) {
+    const resp = await fetch(`/api/prontuarios/${id}`);
+    const data = await resp.json();
+    if (!data || !data.success) throw new Error(data && data.message ? data.message : 'Erro ao carregar');
+    return data;
+}
+
+function escapeHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function nl2br(s) {
+    return escapeHtml(s).replace(/\n/g, '<br/>');
+}
+
+async function visualizarProntuario(id) {
+    try {
+        const modal = new bootstrap.Modal(document.getElementById('modalVisualizarProntuario'));
+        document.getElementById('conteudoProntuario').textContent = 'Carregando...';
+        document.getElementById('conteudoEvolucoes').textContent = 'Carregando...';
+        modal.show();
+
+        const data = await carregarProntuario(id);
+        const p = data.prontuario;
+        document.getElementById('conteudoProntuario').innerHTML = `
+            <div class="row g-2">
+                <div class="col-md-6"><strong>Paciente:</strong> ${escapeHtml(p.paciente_nome)}</div>
+                <div class="col-md-6"><strong>Profissional:</strong> ${escapeHtml(p.profissional_nome)}</div>
+                <div class="col-md-6"><strong>Data:</strong> ${escapeHtml(p.data_atendimento)}</div>
+                <div class="col-md-6"><strong>Tipo:</strong> ${escapeHtml(p.tipo_atendimento)}</div>
+                <div class="col-12"><strong>Queixa:</strong><div>${nl2br(p.queixa_principal)}</div></div>
+                <div class="col-12"><strong>História:</strong><div>${nl2br(p.historia_doenca)}</div></div>
+                <div class="col-12"><strong>Diagnóstico:</strong><div>${nl2br(p.diagnostico)}</div></div>
+                <div class="col-12"><strong>Plano:</strong><div>${nl2br(p.plano_tratamento)}</div></div>
+            </div>
+        `;
+
+        const evol = data.evolucoes || [];
+        document.getElementById('conteudoEvolucoes').innerHTML = evol.length
+            ? evol.map(ev => `
+                <div class="border rounded p-2 mb-2">
+                    <div class="text-muted small">${escapeHtml(ev.data_evolucao)}</div>
+                    <div>${nl2br(ev.texto)}</div>
+                </div>
+            `).join('')
+            : '<div class="text-muted">Sem evoluções registradas.</div>';
+    } catch (e) {
+        if (window.app && app.utils && app.utils.showNotification) {
+            app.utils.showNotification('Erro ao visualizar prontuário', 'error');
+        }
+        console.error(e);
+    }
+}
+
+async function editarProntuario(id) {
+    try {
+        const data = await carregarProntuario(id);
+        const p = data.prontuario;
+        document.getElementById('prontuario_id').value = p.id;
+        document.getElementById('prontuario_paciente_id').value = p.paciente_id;
+        document.getElementById('prontuario_profissional_id').value = p.profissional_id;
+        document.getElementById('prontuario_data_atendimento').value = String(p.data_atendimento).slice(0, 10);
+        document.getElementById('prontuario_tipo_atendimento').value = p.tipo_atendimento;
+        document.getElementById('prontuario_queixa_principal').value = p.queixa_principal;
+        document.getElementById('prontuario_historia_doenca').value = p.historia_doenca;
+        document.getElementById('prontuario_historia_patologica').value = p.historia_patologica || '';
+        document.getElementById('prontuario_historia_fisiologica').value = p.historia_fisiologica || '';
+        document.getElementById('prontuario_exame_fisico').value = p.exame_fisico || '';
+        document.getElementById('prontuario_diagnostico').value = p.diagnostico;
+        document.getElementById('prontuario_plano_tratamento').value = p.plano_tratamento;
+        document.getElementById('prontuario_prognostico').value = p.prognostico || '';
+        document.getElementById('prontuario_observacoes').value = p.observacoes || '';
+        document.getElementById('prontuario_status').value = p.status || 'em_andamento';
+
+        const modal = new bootstrap.Modal(document.getElementById('modalProntuario'));
+        modal.show();
+    } catch (e) {
+        if (window.app && app.utils && app.utils.showNotification) {
+            app.utils.showNotification('Erro ao carregar prontuário para edição', 'error');
+        }
+        console.error(e);
+    }
+}
+
+function abrirEvolucao(id) {
+    document.getElementById('evolucao_prontuario_id').value = id;
+    document.getElementById('evolucao_texto').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('modalEvolucao'));
+    modal.show();
+}
+
+async function salvarEvolucao() {
+    try {
+        const id = document.getElementById('evolucao_prontuario_id').value;
+        const texto = document.getElementById('evolucao_texto').value;
+        const resp = await fetch(`/prontuarios/${id}/evolucoes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texto })
+        });
+        const data = await resp.json();
+        if (!data || !data.success) throw new Error(data && data.message ? data.message : 'Erro');
+
+        if (window.app && app.utils && app.utils.showNotification) {
+            app.utils.showNotification('Evolução salva com sucesso', 'success');
+        }
+        const modalEl = document.getElementById('modalEvolucao');
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+    } catch (e) {
+        if (window.app && app.utils && app.utils.showNotification) {
+            app.utils.showNotification('Erro ao salvar evolução', 'error');
+        }
+        console.error(e);
+    }
+}
+</script>

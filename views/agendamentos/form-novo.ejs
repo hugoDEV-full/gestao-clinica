@@ -1,0 +1,138 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-calendar-plus"></i> Novo Agendamento</h3>
+    <a href="/agendamentos" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <% } %>
+        
+        <form action="/agendamentos" method="POST">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="paciente_id" class="form-label">Paciente *</label>
+                    <select class="form-select" id="paciente_id" name="paciente_id" required>
+                        <option value="">Selecione um paciente...</option>
+                        <% if (typeof pacientes !== 'undefined' && pacientes && pacientes.length) { %>
+                            <% pacientes.forEach(p => { %>
+                                <option value="<%= p.id %>"><%= p.nome %> (CPF: <%= p.cpf %>)</option>
+                            <% }) %>
+                        <% } %>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="profissional_id" class="form-label">Profissional *</label>
+                    <select class="form-select" id="profissional_id" name="profissional_id" required>
+                        <option value="">Selecione um profissional...</option>
+                        <% if (typeof profissionais !== 'undefined' && profissionais && profissionais.length) { %>
+                            <% profissionais.forEach(pr => { %>
+                                <option value="<%= pr.id %>"><%= pr.nome %></option>
+                            <% }) %>
+                        <% } %>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="data_hora" class="form-label">Data e Hora *</label>
+                    <input type="datetime-local" class="form-control" id="data_hora" name="data_hora" required>
+                </div>
+                <div class="col-md-2">
+                    <label for="duracao_minutos" class="form-label">Duração (min) *</label>
+                    <input type="number" class="form-control" id="duracao_minutos" name="duracao_minutos" value="30" min="15" max="240" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="tipo_consulta" class="form-label">Tipo de Consulta *</label>
+                    <select class="form-select" id="tipo_consulta" name="tipo_consulta" required>
+                        <option value="">Selecione...</option>
+                        <option value="avaliacao">Avaliação</option>
+                        <option value="fisioterapia">Fisioterapia</option>
+                        <option value="osteopatia">Osteopatia</option>
+                        <option value="pilates">Pilates</option>
+                        <option value="reavaliacao">Reavaliação</option>
+                        <option value="alta">Alta</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label for="observacoes" class="form-label">Observações</label>
+                    <textarea class="form-control" id="observacoes" name="observacoes" rows="4" placeholder="Observações sobre o agendamento..."></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label for="valor" class="form-label">Valor da Consulta</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input type="number" class="form-control" id="valor" name="valor" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="forma_pagamento" class="form-label">Forma de Pagamento</label>
+                    <select class="form-select" id="forma_pagamento" name="forma_pagamento">
+                        <option value="">Selecione...</option>
+                        <option value="dinheiro">Dinheiro</option>
+                        <option value="cartao">Cartão</option>
+                        <option value="pix">PIX</option>
+                        <option value="boleto">Boleto</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="status_pagamento" class="form-label">Status do Pagamento</label>
+                    <select class="form-select" id="status_pagamento" name="status_pagamento">
+                        <option value="">Selecione...</option>
+                        <option value="pendente">Pendente</option>
+                        <option value="pago">Pago</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="convenio" class="form-label">Convênio</label>
+                    <select class="form-select" id="convenio" name="convenio">
+                        <option value="">Selecione...</option>
+                        <option value="particular">Particular</option>
+                        <option value="unimed">Unimed</option>
+                        <option value="amil">Amil</option>
+                        <option value="bradesco">Bradesco Saúde</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="enviar_lembrete" name="enviar_lembrete" checked>
+                        <label class="form-check-label" for="enviar_lembrete">
+                            Enviar lembrete automático por WhatsApp
+                        </label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmar_whatsapp" name="confirmar_whatsapp" checked>
+                        <label class="form-check-label" for="confirmar_whatsapp">
+                            Confirmar agendamento via WhatsApp
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between">
+                        <a href="/agendamentos" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <div>
+                            <button type="reset" class="btn btn-outline-warning me-2">
+                                <i class="bi bi-arrow-clockwise"></i> Limpar
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Agendar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

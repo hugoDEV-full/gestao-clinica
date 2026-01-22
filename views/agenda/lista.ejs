@@ -1,0 +1,441 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-calendar-check"></i> Agenda</h3>
+    <div class="btn-group">
+        <button type="button" class="btn btn-primary" onclick="window.location.href='/agendamentos/novo'" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Criar um novo agendamento para um paciente (data, horário, profissional e tipo).">
+            <i class="bi bi-plus-circle"></i> Novo Agendamento
+        </button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Exportar a lista exibida (considerando os filtros atuais).">
+            <i class="bi bi-download"></i> Exportar
+        </button>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="/agenda">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Data</label>
+                <input type="date" class="form-control" name="data" value="<%= (filtros && filtros.data) ? filtros.data : dataSelecionada %>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="filtroStatus" name="status">
+                    <option value="">Todos</option>
+                    <option value="agendado" <%= (filtros && filtros.status === 'agendado') ? 'selected' : '' %>>Agendado</option>
+                    <option value="confirmado" <%= (filtros && filtros.status === 'confirmado') ? 'selected' : '' %>>Confirmado</option>
+                    <option value="realizado" <%= (filtros && filtros.status === 'realizado') ? 'selected' : '' %>>Realizado</option>
+                    <option value="cancelado" <%= (filtros && filtros.status === 'cancelado') ? 'selected' : '' %>>Cancelado</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Profissional</label>
+                <select class="form-select" id="filtroProfissional" name="profissional_id">
+                    <option value="">Todos</option>
+                    <% if (typeof profissionais !== 'undefined' && profissionais && profissionais.length) { %>
+                        <% profissionais.forEach(p => { %>
+                            <option value="<%= p.id %>" <%= (filtros && filtros.profissional_id && String(filtros.profissional_id) === String(p.id)) ? 'selected' : '' %>><%= p.nome %></option>
+                        <% }) %>
+                    <% } %>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Período</label>
+                <select class="form-select" id="filtroPeriodo" name="periodo">
+                    <option value="">Todos</option>
+                    <option value="hoje" <%= (filtros && filtros.periodo === 'hoje') ? 'selected' : '' %>>Hoje</option>
+                    <option value="semana" <%= (filtros && filtros.periodo === 'semana') ? 'selected' : '' %>>Esta Semana</option>
+                    <option value="mes" <%= (filtros && filtros.periodo === 'mes') ? 'selected' : '' %>>Este Mês</option>
+                </select>
+            </div>
+            <div class="col-md-12 d-flex justify-content-end gap-2">
+                <a href="/agenda" class="btn btn-outline-secondary" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Limpar todos os filtros e voltar para a visualização padrão.">
+                    <i class="bi bi-x-circle"></i> Limpar
+                </a>
+                <button type="submit" class="btn btn-outline-secondary" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Aplicar os filtros selecionados e atualizar a lista.">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+            </div>
+        </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Agendamentos -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-list-ul"></i> Agendamentos
+        </h5>
+    </div>
+    <div class="card-body">
+        <% if (agenda.length > 0) { %>
+            <div class="table-responsive">
+                <table class="table table-hover" id="tabelaAgendamentos">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Paciente</th>
+                            <th>Profissional</th>
+                            <th>Tipo</th>
+                            <th>Duração</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% agenda.forEach(agendamento => { %>
+                        <tr data="<%= moment(agendamento.data_hora).format('YYYY-MM-DD') %>">
+                            <td>
+                                <div><%= moment(agendamento.data_hora).format('DD/MM/YYYY') %></div>
+                                <small class="text-muted d-block"><%= moment(agendamento.data_hora).format('HH:mm') %></small>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                        <%= agendamento.paciente_nome.charAt(0).toUpperCase() %>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold"><%= agendamento.paciente_nome %></div>
+                                        <small class="text-muted">CPF: <%= agendamento.paciente_cpf || 'Não informado' %></small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><%= agendamento.profissional_nome || 'Não informado' %></td>
+                            <td>
+                                <span class="badge bg-primary"><i class="bi bi-tag"></i> <%= agendamento.tipo_consulta || 'Consulta' %></span>
+                            </td>
+                            <td><%= agendamento.duracao_minutos || 30 %> min</td>
+                            <td>
+                                <% const st = (agendamento.status || '').toLowerCase(); %>
+                                <% const badge = st === 'confirmado' ? 'bg-success' : (st === 'cancelado' ? 'bg-danger' : (st === 'realizado' ? 'bg-secondary' : 'bg-warning')); %>
+                                <span class="badge <%= badge %>"><%= agendamento.status || 'agendado' %></span>
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar dados do agendamento (data, horário, profissional e observações)." onclick="editarAgendamento(<%= agendamento.id %>)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Marcar como confirmado: registra a presença do paciente neste horário." onclick="confirmarPresenca(<%= agendamento.id %>)">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Remarcar a consulta: alterar data/horário mantendo o histórico do paciente." onclick="remarcarAgendamento(<%= agendamento.id %>)">
+                                        <i class="bi bi-calendar-event"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Cancelar a consulta deste horário (o cadastro do paciente não é excluído)." onclick="cancelarAgendamento(<%= agendamento.id %>)">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x fs-1 text-muted"></i>
+                <h5 class="text-muted mt-3">Nenhum agendamento para esta data</h5>
+                <p class="text-muted">Não há consultas agendadas para <%= moment(dataSelecionada).format('DD/MM/YYYY') %>.</p>
+                <a href="/agendamentos/novo" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Novo Agendamento
+                </a>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<!-- Modal de Edição -->
+<div class="modal fade" id="modalEdicao" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Agendamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="conteudoEdicao">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação -->
+<div class="modal fade" id="modalConfirmacao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmacaoTitulo">Confirmar Ação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmacaoMensagem"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmacaoBotao">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -23px;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #667eea;
+    border: 2px solid white;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.timeline-time {
+    position: sticky;
+    top: 20px;
+}
+
+.card.border-success {
+    border-left: 4px solid #28a745;
+}
+
+.card.border-warning {
+    border-left: 4px solid #ffc107;
+}
+
+.card.border-danger {
+    border-left: 4px solid #dc3545;
+}
+
+.card.border-info {
+    border-left: 4px solid #17a2b8;
+}
+
+.card.border-primary {
+    border-left: 4px solid #667eea;
+}
+
+.card.border-secondary {
+    border-left: 4px solid #6c757d;
+}
+
+.timeline-time {
+    position: sticky;
+    top: 20px;
+}
+</style>
+
+<script>
+function getStatusColor(status) {
+    const colors = {
+        'agendado': 'border-info',
+        'confirmado': 'border-success',
+        'cancelado': 'border-danger',
+        'realizado': 'border-primary',
+        'pendente': 'border-warning'
+    };
+    return colors[status] || 'border-secondary';
+}
+
+function getBadgeColor(status) {
+    const colors = {
+        'agendado': 'bg-info',
+        'confirmado': 'bg-success',
+        'cancelado': 'bg-danger',
+        'realizado': 'bg-primary',
+        'pendente': 'bg-warning'
+    };
+    return colors[status] || 'bg-secondary';
+}
+
+function getStatusText(status) {
+    const texts = {
+        'agendado': 'Agendado',
+        'confirmado': 'Confirmado',
+        'cancelado': 'Cancelado',
+        'realizado': 'Realizado',
+        'pendente': 'Pendente'
+    };
+    return texts[status] || status;
+}
+
+function getTipoIcon(tipo) {
+    const icons = {
+        'avaliacao': '<i class="bi bi-clipboard-pulse"></i>',
+        'fisioterapia': '<i class="bi bi-heart-pulse"></i>',
+        'osteopatia': '<i class="bi bi-bone"></i>',
+        'pilates': '<i class="bi bi-activity"></i>',
+        'reavaliacao': '<i class="bi bi-arrow-repeat"></i>',
+        'alta': '<i class="bi bi-check-circle"></i>'
+    };
+    return icons[tipo] || '<i class="bi bi-clipboard"></i>';
+}
+
+function getTipoText(tipo) {
+    const texts = {
+        'avaliacao': 'Avaliação',
+        'fisioterapia': 'Fisioterapia',
+        'osteopatia': 'Osteopatia',
+        'pilates': 'Pilates',
+        'reavaliacao': 'Reavaliação',
+        'alta': 'Alta'
+    };
+    return texts[tipo] || tipo;
+}
+
+// Filtros
+function filtrarAgendamentos() {
+    const status = document.getElementById('filtroStatus').value;
+    const profissional = document.getElementById('filtroProfissional').value;
+    const periodo = document.getElementById('filtroPeriodo').value;
+    const busca = document.getElementById('buscaAgendamento').value.toLowerCase();
+    const linhas = document.querySelectorAll('#tabelaAgendamentos tbody tr');
+    
+    linhas.forEach(linha => {
+        const statusLinha = linha.cells[4].textContent.toLowerCase();
+        const profissionalLinha = linha.cells[1].textContent.toLowerCase();
+        const pacienteLinha = linha.cells[0].textContent.toLowerCase();
+        
+        const correspondeStatus = !status || statusLinha.includes(status);
+        const correspondeProfissional = !profissional || profissionalLinha.includes(profissional);
+        const correspondeBusca = !busca || pacienteLinha.includes(busca);
+        
+        // Verificar período
+        let correspondePeriodo = true;
+        if (periodo === 'hoje') {
+            const dataAgendamento = new Date(linha.cells[0].getAttribute('data'));
+            const hoje = new Date();
+            correspondePeriodo = dataAgendamento.toDateString() === hoje.toDateString();
+        } else if (periodo === 'semana') {
+            const dataAgendamento = new Date(linha.cells[0].getAttribute('data'));
+            const semana = new Date();
+            const diffDias = Math.floor((semana - dataAgendamento) / (1000 * 60 * 60 * 24));
+            correspondePeriodo = diffDias <= 7;
+        } else if (periodo === 'mes') {
+            const dataAgendamento = new Date(linha.cells[0].getAttribute('data'));
+            const mes = new Date();
+            correspondePeriodo = dataAgendamento.getMonth() === mes.getMonth() && dataAgendamento.getFullYear() === mes.getFullYear();
+        }
+        
+        linha.style.display = (correspondeStatus && correspondeProfissional && correspondeBusca && correspondePeriodo) ? '' : 'none';
+    });
+}
+
+function editarAgendamento(id) {
+    window.location.href = '/agendamentos/' + id + '/editar';
+}
+
+function confirmarPresenca(id) {
+    const modal = new bootstrap.Modal(document.getElementById('modalConfirmacao'));
+    document.getElementById('confirmacaoTitulo').textContent = 'Confirmar Presença';
+    document.getElementById('confirmacaoMensagem').textContent = 'Deseja confirmar a presença do paciente neste agendamento?';
+    
+    document.getElementById('confirmacaoBotao').onclick = function() {
+        fetch('/agenda/' + id + '/status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: 'confirmado' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao confirmar presença: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao confirmar presença');
+        });
+        
+        modal.hide();
+    };
+    
+    modal.show();
+}
+
+function remarcarAgendamento(id) {
+    window.location.href = '/agendamentos/' + id + '/remarcar';
+}
+
+function cancelarAgendamento(id) {
+    const modal = new bootstrap.Modal(document.getElementById('modalConfirmacao'));
+    document.getElementById('confirmacaoTitulo').textContent = 'Cancelar Agendamento';
+    document.getElementById('confirmacaoMensagem').textContent = 'Deseja cancelar este agendamento? Esta ação não poderá ser desfeita.';
+    
+    document.getElementById('confirmacaoBotao').onclick = function() {
+        fetch('/agenda/' + id + '/cancelar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ motivo: 'Cancelado pelo usuário' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao cancelar agendamento: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao cancelar agendamento');
+        });
+        
+        modal.hide();
+    };
+    
+    modal.show();
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar listeners aos filtros
+    const filtros = ['filtroStatus', 'filtroProfissional', 'filtroPeriodo', 'buscaAgendamento'];
+    filtros.forEach(filtro => {
+        if (filtro) {
+            filtro.addEventListener('input', filtrarAgendamentos);
+            filtro.addEventListener('change', filtrarAgendamentos);
+        }
+    });
+});
+</script>

@@ -1,0 +1,458 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-whatsapp"></i> WhatsApp - Teste</h3>
+    <a href="/dashboard" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="row">
+    <!-- Status do WhatsApp -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle"></i> Status do WhatsApp
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="whatsapp-status" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2">Verificando status...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- QR Code -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-qr-code"></i> QR Code
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="qr-code-container" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2">Carregando QR Code...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Testes -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-gear"></i> Testes e Configurações
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <h6>Número de envio (configuração)</h6>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroEnvio" placeholder="5561982976481">
+                            <button type="button" class="btn btn-outline-success" onclick="salvarNumeroEnvio()">
+                                <i class="bi bi-save"></i> Salvar
+                            </button>
+                        </div>
+                        <small class="text-muted">Apenas administradores conseguem alterar.</small>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-primary w-100" onclick="testarStatus()">
+                            <i class="bi bi-check-circle"></i> Testar Status
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-outline-success w-100" onclick="iniciarWhatsApp()">
+                            <i class="bi bi-play-circle"></i> Iniciar WhatsApp
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-success w-100" onclick="testarEnvio()">
+                            <i class="bi bi-send"></i> Enviar Mensagem Teste
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-warning w-100" onclick="reativarWhatsApp()">
+                            <i class="bi bi-arrow-clockwise"></i> Reativar WhatsApp
+                        </button>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6>Testar Envio para Número Específico</h6>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroTeste" 
+                                   placeholder="5561982976481">
+                            <button type="button" class="btn btn-outline-primary" onclick="testarNumero()">
+                                <i class="bi bi-send"></i> Testar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Verificar Número no WhatsApp</h6>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroVerificar" 
+                                   placeholder="5561982976481">
+                            <button type="button" class="btn btn-outline-info" onclick="verificarNumero()">
+                                <i class="bi bi-search"></i> Verificar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Log de Atividades -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-terminal"></i> Log de Atividades
+                </h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="limparLog()">
+                    <i class="bi bi-trash"></i> Limpar
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="log-container" style="background: #f8f9fa; padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 14px;">
+                    <div class="text-muted">Aguardando atividades...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.status-connected {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-disconnected {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.status-connecting {
+    color: #ffc107;
+    font-weight: bold;
+}
+
+.qr-code-image {
+    max-width: 300px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    background: white;
+}
+
+.log-entry {
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.log-entry.info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.log-entry.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.log-entry.warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.log-entry.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<script>
+let logContainer = document.getElementById('log-container');
+
+function addLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${type}`;
+    logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+    
+    logContainer.appendChild(logEntry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function limparLog() {
+    logContainer.innerHTML = '<div class="text-muted">Log limpo...</div>';
+}
+
+function carregarNumeroEnvio() {
+    fetch('/api/whatsapp/config')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.config) {
+                document.getElementById('numeroEnvio').value = data.config.phoneNumber || '';
+            }
+        })
+        .catch(() => {
+            // Sem permissão (não admin) ou erro: ignora
+        });
+}
+
+function salvarNumeroEnvio() {
+    const numero = document.getElementById('numeroEnvio').value;
+    fetch('/api/whatsapp/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: numero })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            addLog('Número de envio salvo com sucesso', 'success');
+            setTimeout(atualizarStatus, 1000);
+        } else {
+            addLog('Erro ao salvar número: ' + (data.message || data.error || 'Erro'), 'error');
+        }
+    })
+    .catch(err => {
+        addLog('Erro ao salvar número: ' + err.message, 'error');
+    });
+}
+
+function iniciarWhatsApp() {
+    addLog('Iniciando WhatsApp...', 'info');
+    fetch('/api/whatsapp/start', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                addLog(data.message || 'WhatsApp iniciando...', 'success');
+                setTimeout(() => {
+                    atualizarStatus();
+                    atualizarQRCode();
+                }, 2000);
+            } else {
+                addLog('Erro ao iniciar WhatsApp: ' + (data.message || data.error || 'Erro'), 'error');
+            }
+        })
+        .catch(err => {
+            addLog('Erro ao iniciar WhatsApp: ' + err.message, 'error');
+        });
+}
+
+function testarStatus() {
+    addLog('Testando status do WhatsApp...', 'info');
+    
+    fetch('/api/whatsapp/status-teste')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addLog('Status obtido com sucesso!', 'success');
+                addLog(`Conectado: ${data.status.isConnected}`, 'info');
+                addLog(`Telefone: ${data.status.phoneNumber}`, 'info');
+            } else {
+                addLog('Erro ao obter status: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            addLog('Erro na requisição: ' + error.message, 'error');
+        });
+}
+
+function testarEnvio() {
+    addLog('Enviando mensagem de teste...', 'info');
+    
+    fetch('/api/whatsapp/teste-voce-mesmo', { method: 'GET' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addLog('Mensagem enviada com sucesso!', 'success');
+                addLog(data.message, 'info');
+            } else {
+                addLog('Falha ao enviar mensagem: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            addLog('Erro na requisição: ' + error.message, 'error');
+        });
+}
+
+function reativarWhatsApp() {
+    addLog('Reativando WhatsApp...', 'warning');
+    
+    fetch('/api/whatsapp/reactivate-teste', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addLog('WhatsApp reativado com sucesso!', 'success');
+                addLog(data.message, 'info');
+                // Atualizar status após 2 segundos
+                setTimeout(atualizarStatus, 2000);
+            } else {
+                addLog('Erro ao reativar: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            addLog('Erro na requisição: ' + error.message, 'error');
+        });
+}
+
+function testarNumero() {
+    const numero = document.getElementById('numeroTeste').value;
+    if (!numero) {
+        addLog('Por favor, informe um número para testar', 'warning');
+        return;
+    }
+    
+    addLog(`Testando envio para ${numero}...`, 'info');
+    
+    // Implementar teste para número específico
+    addLog('Funcionalidade em desenvolvimento', 'warning');
+}
+
+function verificarNumero() {
+    const numero = document.getElementById('numeroVerificar').value;
+    if (!numero) {
+        addLog('Por favor, informe um número para verificar', 'warning');
+        return;
+    }
+    
+    addLog(`Verificando número ${numero} no WhatsApp...`, 'info');
+    
+    fetch('/api/whatsapp/verify', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber: numero })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addLog(`Número verificado: ${data.exists ? 'Existe no WhatsApp' : 'Não encontrado'}`, data.exists ? 'success' : 'warning');
+        } else {
+            addLog('Erro ao verificar número: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        addLog('Erro na requisição: ' + error.message, 'error');
+    });
+}
+
+function atualizarStatus() {
+    const statusDiv = document.getElementById('whatsapp-status');
+    
+    fetch('/api/whatsapp/status-teste')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const isStarting = !!(data.status && data.status.isStarting);
+                const statusClass = data.status.isConnected ? 'status-connected' : (isStarting ? 'status-connecting' : 'status-disconnected');
+                const statusText = data.status.isConnected ? 'Conectado' : (isStarting ? 'Iniciando...' : 'Desconectado');
+                const statusIcon = data.status.isConnected ? 'bi-check-circle-fill' : (isStarting ? 'bi-hourglass-split' : 'bi-x-circle-fill');
+                
+                statusDiv.innerHTML = `
+                    <div class="${statusClass}">
+                        <i class="bi ${statusIcon} fs-1"></i>
+                        <h4 class="mt-2">${statusText}</h4>
+                        <p class="mb-0">Telefone: ${data.status.phoneNumber || 'Não configurado'}</p>
+                    </div>
+                `;
+                
+                addLog(`Status atualizado: ${statusText}`, 'info');
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="status-disconnected">
+                        <i class="bi bi-x-circle-fill fs-1"></i>
+                        <h4 class="mt-2">Erro</h4>
+                        <p class="mb-0">${data.error}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            statusDiv.innerHTML = `
+                <div class="status-disconnected">
+                    <i class="bi bi-x-circle-fill fs-1"></i>
+                    <h4 class="mt-2">Erro de Conexão</h4>
+                    <p class="mb-0">Não foi possível verificar o status</p>
+                </div>
+            `;
+        });
+}
+
+function atualizarQRCode() {
+    const qrDiv = document.getElementById('qr-code-container');
+    
+    fetch('/api/whatsapp/qrcode-teste')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.qrCode) {
+                qrDiv.innerHTML = `
+                    <div class="qr-code-image">
+                        <div id="qrCodeCanvas"></div>
+                    </div>
+                    <p class="mt-2 text-muted">Escaneie o QR Code com seu WhatsApp</p>
+                `;
+                const el = document.getElementById('qrCodeCanvas');
+                el.innerHTML = '';
+                new QRCode(el, { text: data.qrCode, width: 280, height: 280 });
+                addLog('QR Code atualizado', 'info');
+            } else {
+                qrDiv.innerHTML = `
+                    <div class="text-muted">
+                        <i class="bi bi-qr-code fs-1"></i>
+                        <p class="mt-2">${(data && data.message) ? data.message : 'QR Code não disponível'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            qrDiv.innerHTML = `
+                <div class="text-danger">
+                    <i class="bi bi-exclamation-triangle fs-1"></i>
+                    <p class="mt-2">Erro ao carregar QR Code</p>
+                </div>
+            `;
+        });
+}
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    addLog('Sistema de teste WhatsApp iniciado', 'info');
+    atualizarStatus();
+    atualizarQRCode();
+    carregarNumeroEnvio();
+    
+    // Atualizar status a cada 30 segundos
+    setInterval(atualizarStatus, 30000);
+    
+    // Atualizar QR Code a cada 60 segundos
+    setInterval(atualizarQRCode, 60000);
+});
+</script>
