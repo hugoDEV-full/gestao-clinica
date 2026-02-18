@@ -1,4 +1,7 @@
-require('dotenv').config({ override: true });
+// Só carregar .env em desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 // Debug: mostrar se Railway Variables estão sendo l1das
 console.log('=== DEBUG Railway Variables ===');
@@ -6,6 +9,7 @@ console.log('DB_HOST:', process.env.DB_HOST);
 console.log('DB_USER:', process.env.DB_USER);
 console.log('DB_NAME:', process.env.DB_NAME);
 console.log('SESSION_SECRET:', process.env.SESSION_SECRET);
+console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('================================');
 
 process.env.TZ = process.env.TZ || 'America/Sao_Paulo';
