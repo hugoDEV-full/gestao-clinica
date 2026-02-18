@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 process.env.TZ = process.env.TZ || 'America/Sao_Paulo';
 const express = require('express');
 const mysql = require('mysql2/promise');
