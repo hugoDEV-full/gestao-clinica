@@ -1,9 +1,23 @@
 const mysql = require('mysql2/promise');
 const fs = require('fs');
+
+// Forçar carregamento das Railway Variables
 require('dotenv').config();
 
 async function setup() {
   console.log('🔧 Iniciando setup do banco de dados Railway...');
+  
+  // Debug: verificar se as Variáveis estão disponíveis
+  console.log('=== DEBUG SETUP Railway Variables ===');
+  console.log('DB_HOST:', process.env.DB_HOST);
+  console.log('DB_USER:', process.env.DB_USER);
+  console.log('DB_NAME:', process.env.DB_NAME);
+  console.log('=====================================');
+  
+  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD) {
+    console.error('❌ Railway Variables não encontradas. Verifique configuração no Railway.');
+    process.exit(1);
+  }
   
   try {
     const connection = await mysql.createConnection({
