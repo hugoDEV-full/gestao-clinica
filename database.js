@@ -4,11 +4,11 @@ let pool;
 
 // Configuração do banco de dados
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'gestao_fisio',
+    host: process.env.DB_HOST || process.env.RAILWAY_DB_HOST || 'localhost',
+    port: process.env.DB_PORT || process.env.RAILWAY_DB_PORT || 3306,
+    user: process.env.DB_USER || process.env.RAILWAY_DB_USER || 'root',
+    password: process.env.DB_PASSWORD || process.env.RAILWAY_DB_PASSWORD || '',
+    database: process.env.DB_NAME || process.env.RAILWAY_DB_NAME || 'gestao_fisio',
     timezone: process.env.DB_TIMEZONE || '-03:00',
     waitForConnections: true,
     connectionLimit: 10,

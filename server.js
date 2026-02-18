@@ -3,12 +3,21 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
+// Fallback para Railway's built-in variables
+const dbHost = process.env.DB_HOST || process.env.RAILWAY_DB_HOST;
+const dbPort = process.env.DB_PORT || process.env.RAILWAY_DB_PORT || 3306;
+const dbUser = process.env.DB_USER || process.env.RAILWAY_DB_USER;
+const dbPassword = process.env.DB_PASSWORD || process.env.RAILWAY_DB_PASSWORD;
+const dbName = process.env.DB_NAME || process.env.RAILWAY_DB_NAME;
+const sessionSecret = process.env.SESSION_SECRET || process.env.RAILWAY_SESSION_SECRET;
+const accessHmacSecret = process.env.ACCESS_HMAC_SECRET || process.env.RAILWAY_ACCESS_HMAC_SECRET;
+
 // Debug: mostrar se Railway Variables estão sendo l1das
 console.log('=== DEBUG Railway Variables ===');
-console.log('DB_HOST:', process.env.DB_HOST);
-console.log('DB_USER:', process.env.DB_USER);
-console.log('DB_NAME:', process.env.DB_NAME);
-console.log('SESSION_SECRET:', process.env.SESSION_SECRET);
+console.log('DB_HOST:', dbHost);
+console.log('DB_USER:', dbUser);
+console.log('DB_NAME:', dbName);
+console.log('SESSION_SECRET:', sessionSecret);
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('================================');
 
@@ -2596,7 +2605,7 @@ let autoBackupTask = null;
 
 async function runAutoBackup(trigger) {
     const db = getDB();
-    const dbName = process.env.DB_NAME || 'gestao_fisio';
+    const dbNameFinal = dbName || 'gestao_fisio';
     const sql = await generateDatabaseDumpSql(db, dbName);
 
     const dir = path.join(__dirname, 'generated_backups');
@@ -2666,7 +2675,7 @@ async function scheduleAutoBackup() {
 app.get('/configuracoes/backup/download', requireAuth, requireAdmin, async (req, res) => {
     try {
         const db = getDB();
-        const dbName = process.env.DB_NAME || 'gestao_fisio';
+        const dbNameFinal = dbName || 'gestao_fisio';
         const sql = await generateDatabaseDumpSql(db, dbName);
 
         const format = String((req.query && req.query.format) || '').toLowerCase();
