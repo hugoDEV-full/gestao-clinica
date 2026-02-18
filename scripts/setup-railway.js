@@ -4,28 +4,37 @@ const fs = require('fs');
 // Forçar carregamento das Railway Variables
 require('dotenv').config();
 
+// Fallback para Railway's built-in variables
+const dbHost = process.env.DB_HOST || process.env.RAILWAY_DB_HOST;
+const dbPort = process.env.DB_PORT || process.env.RAILWAY_DB_PORT || 3306;
+const dbUser = process.env.DB_USER || process.env.RAILWAY_DB_USER;
+const dbPassword = process.env.DB_PASSWORD || process.env.RAILWAY_DB_PASSWORD;
+const dbName = process.env.DB_NAME || process.env.RAILWAY_DB_NAME;
+
 async function setup() {
   console.log('🔧 Iniciando setup do banco de dados Railway...');
   
   // Debug: verificar se as Variáveis estão disponíveis
   console.log('=== DEBUG SETUP Railway Variables ===');
-  console.log('DB_HOST:', process.env.DB_HOST);
-  console.log('DB_USER:', process.env.DB_USER);
-  console.log('DB_NAME:', process.env.DB_NAME);
+  console.log('DB_HOST:', dbHost);
+  console.log('DB_USER:', dbUser);
+  console.log('DB_NAME:', dbName);
+  console.log('DB_PORT:', dbPort);
   console.log('=====================================');
   
-  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD) {
+  if (!dbHost || !dbUser || !dbPassword) {
     console.error('❌ Railway Variables não encontradas. Verifique configuração no Railway.');
+    console.error('Tentando variáveis:', { dbHost, dbUser, dbName, dbPort });
     process.exit(1);
   }
   
   try {
     const connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      host: dbHost,
+      port: dbPort,
+      user: dbUser,
+      password: dbPassword,
+      database: dbName,
       ssl: { rejectUnauthorized: false }
     });
 
