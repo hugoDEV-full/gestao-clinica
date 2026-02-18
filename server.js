@@ -1,4 +1,13 @@
 require('dotenv').config({ override: true });
+
+// Debug: mostrar se Railway Variables estão sendo l1das
+console.log('=== DEBUG Railway Variables ===');
+console.log('DB_HOST:', process.env.DB_HOST);
+console.log('DB_USER:', process.env.DB_USER);
+console.log('DB_NAME:', process.env.DB_NAME);
+console.log('SESSION_SECRET:', process.env.SESSION_SECRET);
+console.log('================================');
+
 process.env.TZ = process.env.TZ || 'America/Sao_Paulo';
 const express = require('express');
 const mysql = require('mysql2/promise');
