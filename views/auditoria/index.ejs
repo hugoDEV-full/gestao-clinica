@@ -67,8 +67,8 @@
                         <% logs.forEach(l => { %>
                             <tr>
                                 <td>
-                                    <div class="fw-bold"><%= l.created_at ? new Date(l.created_at).toLocaleDateString('pt-BR') : '-' %></div>
-                                    <small class="text-muted"><%= l.created_at ? new Date(l.created_at).toLocaleTimeString('pt-BR') : '' %></small>
+                                    <div class="fw-bold"><%= l.created_at ? new Date(l.created_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-' %></div>
+                                    <small class="text-muted"><%= l.created_at ? new Date(l.created_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '' %></small>
                                 </td>
                                 <td>
                                     <div class="fw-bold"><%= l.usuario_nome || ('ID ' + l.usuario_id) %></div>
@@ -115,6 +115,35 @@
 <script>
 const logs = <%- JSON.stringify(logs || []) %>;
 
+function toBrDateTime(value) {
+    try {
+        if (value == null) return value;
+        const s = String(value);
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return value;
+        return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    } catch {
+        return value;
+    }
+}
+
+function normalizePayloadDates(input) {
+    if (input == null) return input;
+    if (typeof input === 'string') {
+        if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(input)) return toBrDateTime(input);
+        return input;
+    }
+    if (Array.isArray(input)) return input.map(normalizePayloadDates);
+    if (typeof input === 'object') {
+        const out = {};
+        Object.keys(input).forEach((k) => {
+            out[k] = normalizePayloadDates(input[k]);
+        });
+        return out;
+    }
+    return input;
+}
+
 function verDetalhes(id) {
     const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
     const el = document.getElementById('detalhesJson');
@@ -140,7 +169,7 @@ function verDetalhes(id) {
         dados_novos: l.dados_novos
     };
 
-    el.textContent = JSON.stringify(payload, null, 2);
+    el.textContent = JSON.stringify(normalizePayloadDates(payload), null, 2);
     modal.show();
 }
 </script>

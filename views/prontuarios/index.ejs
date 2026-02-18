@@ -1,9 +1,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3><i class="bi bi-file-medical"></i> Prontuários</h3>
     <div class="btn-group">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProntuario" onclick="novoProntuario()" data-bs-placement="bottom" title="Criar um novo prontuário para registrar o atendimento e o plano de tratamento.">
-            <i class="bi bi-plus-circle"></i> Novo Prontuário
-        </button>
+        <% if (usuario && usuario.tipo !== 'secretaria') { %>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProntuario" data-action="prontuario-novo" data-bs-placement="bottom" title="Criar um novo prontuário para registrar o atendimento e o plano de tratamento.">
+                <i class="bi bi-plus-circle"></i> Novo Prontuário
+            </button>
+        <% } %>
         <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('formFiltrosProntuarios')?.scrollIntoView({behavior:'smooth'})" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Ir para os filtros de busca (paciente, profissional e período).">
             <i class="bi bi-search"></i> Buscar
         </button>
@@ -73,7 +75,9 @@
                         <th>Paciente</th>
                         <th>Profissional</th>
                         <th>Tipo Atendimento</th>
-                        <th>Diagnóstico</th>
+                        <% if (!(usuario && usuario.tipo === 'secretaria')) { %>
+                            <th>Diagnóstico</th>
+                        <% } %>
                         <th>Status</th>
                         <th>Ações</th>
                     </tr>
@@ -84,7 +88,7 @@
                             <% const st = (p.status || '').toLowerCase(); %>
                             <% const badge = (st === 'concluido' || st === 'concluído') ? 'bg-secondary' : (st === 'cancelado' ? 'bg-danger' : 'bg-success'); %>
                             <tr>
-                                <td><%= moment(p.data_atendimento).format('DD/MM/YYYY') %></td>
+                                <td><%= moment(String(p.data_atendimento || '').slice(0, 10), 'YYYY-MM-DD').format('DD/MM/YYYY') %></td>
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
@@ -98,29 +102,33 @@
                                 </td>
                                 <td><%= p.profissional_nome || 'Não informado' %></td>
                                 <td><span class="badge bg-info"><%= p.tipo_atendimento || 'Atendimento' %></span></td>
-                                <td><%= p.diagnostico ? String(p.diagnostico).slice(0, 60) : '-' %></td>
+                                <% if (!(usuario && usuario.tipo === 'secretaria')) { %>
+                                    <td><%= p.diagnostico ? String(p.diagnostico).slice(0, 60) : '-' %></td>
+                                <% } %>
                                 <td><span class="badge <%= badge %>"><%= p.status || 'em_andamento' %></span></td>
                                 <td>
                                     <div class="btn-group">
-                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Visualizar detalhes do prontuário e as evoluções registradas." onclick="visualizarProntuario('<%= p.id %>')">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Visualizar detalhes do prontuário e as evoluções registradas." data-action="prontuario-visualizar" data-id="<%= p.id %>">
                                             <i class="bi bi-eye"></i>
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar informações clínicas deste atendimento (diagnóstico, plano, observações, etc.)." onclick="editarProntuario('<%= p.id %>')">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Adicionar evolução: registrar acompanhamento/observação após o atendimento." onclick="abrirEvolucao('<%= p.id %>')">
-                                            <i class="bi bi-plus-circle"></i>
-                                        </button>
-                                        <a class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Imprimir/gerar versão para papel (abre em nova aba)." href="/prontuarios/<%= p.id %>/imprimir" target="_blank">
-                                            <i class="bi bi-printer"></i>
-                                        </a>
+                                        <% if (!(usuario && usuario.tipo === 'secretaria')) { %>
+                                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar informações clínicas deste atendimento (diagnóstico, plano, observações, etc.)." data-action="prontuario-editar" data-id="<%= p.id %>">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Adicionar evolução: registrar acompanhamento/observação após o atendimento." data-action="prontuario-evolucao" data-id="<%= p.id %>">
+                                                <i class="bi bi-plus-circle"></i>
+                                            </button>
+                                            <a class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Imprimir/gerar versão para papel (abre em nova aba)." href="/prontuarios/<%= p.id %>/imprimir" target="_blank">
+                                                <i class="bi bi-printer"></i>
+                                            </a>
+                                        <% } %>
                                     </div>
                                 </td>
                             </tr>
                         <% }) %>
                     <% } else { %>
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">Nenhum prontuário encontrado</td>
+                            <td colspan="<%= (usuario && usuario.tipo === 'secretaria') ? 6 : 7 %>" class="text-center text-muted py-4">Nenhum prontuário encontrado</td>
                         </tr>
                     <% } %>
                 </tbody>
@@ -282,6 +290,32 @@ function novoProntuario() {
     document.getElementById('formProntuario').reset();
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-action="prontuario-novo"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            try { novoProntuario(); } catch (e) {}
+        });
+    });
+    document.querySelectorAll('[data-action="prontuario-visualizar"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            visualizarProntuario(id);
+        });
+    });
+    document.querySelectorAll('[data-action="prontuario-editar"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            editarProntuario(id);
+        });
+    });
+    document.querySelectorAll('[data-action="prontuario-evolucao"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            abrirEvolucao(id);
+        });
+    });
+});
+
 async function carregarProntuario(id) {
     const resp = await fetch(`/api/prontuarios/${id}`);
     const data = await resp.json();
@@ -302,6 +336,13 @@ function nl2br(s) {
     return escapeHtml(s).replace(/\n/g, '<br/>');
 }
 
+function formatDateBrFromYmd(value) {
+    const s = String(value || '').slice(0, 10);
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return s;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 async function visualizarProntuario(id) {
     try {
         const modal = new bootstrap.Modal(document.getElementById('modalVisualizarProntuario'));
@@ -311,16 +352,17 @@ async function visualizarProntuario(id) {
 
         const data = await carregarProntuario(id);
         const p = data.prontuario;
+        const isSecretaria = false;
         document.getElementById('conteudoProntuario').innerHTML = `
             <div class="row g-2">
                 <div class="col-md-6"><strong>Paciente:</strong> ${escapeHtml(p.paciente_nome)}</div>
                 <div class="col-md-6"><strong>Profissional:</strong> ${escapeHtml(p.profissional_nome)}</div>
-                <div class="col-md-6"><strong>Data:</strong> ${escapeHtml(p.data_atendimento)}</div>
+                <div class="col-md-6"><strong>Data:</strong> ${escapeHtml(formatDateBrFromYmd(p.data_atendimento))}</div>
                 <div class="col-md-6"><strong>Tipo:</strong> ${escapeHtml(p.tipo_atendimento)}</div>
-                <div class="col-12"><strong>Queixa:</strong><div>${nl2br(p.queixa_principal)}</div></div>
-                <div class="col-12"><strong>História:</strong><div>${nl2br(p.historia_doenca)}</div></div>
-                <div class="col-12"><strong>Diagnóstico:</strong><div>${nl2br(p.diagnostico)}</div></div>
-                <div class="col-12"><strong>Plano:</strong><div>${nl2br(p.plano_tratamento)}</div></div>
+                ${isSecretaria ? '' : `<div class="col-12"><strong>Queixa:</strong><div>${nl2br(p.queixa_principal)}</div></div>`}
+                ${isSecretaria ? '' : `<div class="col-12"><strong>História:</strong><div>${nl2br(p.historia_doenca)}</div></div>`}
+                ${isSecretaria ? '' : `<div class="col-12"><strong>Diagnóstico:</strong><div>${nl2br(p.diagnostico)}</div></div>`}
+                ${isSecretaria ? '' : `<div class="col-12"><strong>Plano:</strong><div>${nl2br(p.plano_tratamento)}</div></div>`}
             </div>
         `;
 
@@ -343,6 +385,8 @@ async function visualizarProntuario(id) {
 
 async function editarProntuario(id) {
     try {
+        const isSecretaria = false;
+        if (isSecretaria) return;
         const data = await carregarProntuario(id);
         const p = data.prontuario;
         document.getElementById('prontuario_id').value = p.id;

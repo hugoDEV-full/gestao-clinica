@@ -24,11 +24,11 @@
   </div>
 
   <% if (isLogged) { %>
-    <button class="btn btn-primary d-md-none position-fixed" style="top:12px; left:12px; z-index:1100" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
+    <button class="btn btn-primary position-fixed" style="top:12px; left:12px; z-index:1100" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
       <i class="bi bi-list"></i>
     </button>
 
-    <div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebar" aria-labelledby="sidebarLabel">
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebar" aria-labelledby="sidebarLabel">
       <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="sidebarLabel">Menu</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -43,21 +43,9 @@
         <%- include('../partials/sidebar', { currentPage: safeCurrentPage, usuario: safeUser }) %>
       </aside>
 
-      <main class="flex-grow-1" style="min-height:100vh; background:#f8f9fa;">
-        <div class="container-fluid py-4">
-          <% if (typeof success !== 'undefined' && success) { %>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-              <i class="bi bi-check-circle"></i> <%= success %>
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-          <% } %>
-
-          <% if (typeof error !== 'undefined' && error) { %>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-              <i class="bi bi-exclamation-triangle"></i> <%= error %>
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-          <% } %>
+      <main class="flex-grow-1 pt-5 pt-md-0" style="min-height:100vh; background:#f8f9fa;">
+        <div class="container-fluid py-4 content-with-hamburger">
+          <%- include('../partials/alerts') %>
 
           <%- body %>
         </div>

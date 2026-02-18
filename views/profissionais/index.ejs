@@ -1,21 +1,24 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3><i class="bi bi-person-workspace"></i> Profissionais</h3>
-    <button type="button" class="btn btn-primary">
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProfissional" data-action="profissional-novo">
         <i class="bi bi-plus-circle"></i> Novo Profissional
     </button>
 </div>
+
+<% const listaProfissionais = Array.isArray(profissionais) ? profissionais : []; %>
 
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
             <i class="bi bi-list-ul"></i> Profissionais Cadastrados
         </h5>
-        <div class="input-group" style="max-width: 300px;">
+        <form class="input-group" style="max-width: 340px;" method="GET" action="/profissionais">
             <span class="input-group-text">
                 <i class="bi bi-search"></i>
             </span>
-            <input type="text" class="form-control" placeholder="Buscar profissional...">
-        </div>
+            <input type="text" class="form-control" name="q" value="<%= filtros && filtros.q ? filtros.q : '' %>" placeholder="Buscar profissional...">
+            <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+        </form>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -32,70 +35,225 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
-                                    A
+                    <% if (listaProfissionais.length === 0) { %>
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">Nenhum profissional encontrado.</td>
+                        </tr>
+                    <% } %>
+
+                    <% listaProfissionais.forEach((p) => { %>
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                        <%= (p.nome || 'P').toString().trim().slice(0, 1).toUpperCase() %>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold"><%= p.nome %></div>
+                                        <small class="text-muted"><%= p.cpf || '' %></small>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div class="fw-bold">André Ballejo</div>
-                                    <small class="text-muted">Fisioterapeuta</small>
+                            </td>
+                            <td><%= p.especialidade || '-' %></td>
+                            <td><%= p.registro_profissional || '-' %></td>
+                            <td><%= p.telefone || '-' %></td>
+                            <td><%= p.email || '-' %></td>
+                            <td>
+                                <% if (p.ativo) { %>
+                                    <span class="badge bg-success">Ativo</span>
+                                <% } else { %>
+                                    <span class="badge bg-danger">Inativo</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="profissional-editar"
+                                        data-id="<%= p.id %>"
+                                        data-nome="<%= (p.nome || '').toString().replace(/"/g, '&quot;') %>"
+                                        data-cpf="<%= (p.cpf || '').toString().replace(/"/g, '&quot;') %>"
+                                        data-especialidade="<%= (p.especialidade || '').toString().replace(/"/g, '&quot;') %>"
+                                        data-registro_profissional="<%= (p.registro_profissional || '').toString().replace(/"/g, '&quot;') %>"
+                                        data-telefone="<%= (p.telefone || '').toString().replace(/"/g, '&quot;') %>"
+                                        data-email="<%= (p.email || '').toString().replace(/"/g, '&quot;') %>"
+                                        data-data_contratacao="<%= p.data_contratacao ? String(p.data_contratacao).slice(0, 10) : '' %>"
+                                        data-salario="<%= (p.salario != null) ? String(p.salario) : '' %>">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <% if (p.ativo) { %>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" data-action="profissional-ativo" data-id="<%= p.id %>" data-ativo="0">
+                                            <i class="bi bi-person-x"></i>
+                                        </button>
+                                    <% } else { %>
+                                        <button type="button" class="btn btn-sm btn-outline-success" data-action="profissional-ativo" data-id="<%= p.id %>" data-ativo="1">
+                                            <i class="bi bi-person-check"></i>
+                                        </button>
+                                    <% } %>
                                 </div>
-                            </div>
-                        </td>
-                        <td><span class="badge bg-primary">Fisioterapia</span></td>
-                        <td>CREFITO: 123456/DF</td>
-                        <td>(61) 99550-4416</td>
-                        <td>andre@clinica.com</td>
-                        <td><span class="badge bg-success">Ativo</span></td>
-                        <td>
-                            <div class="btn-group">
-                                <button type="button" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-info">
-                                    <i class="bi bi-calendar"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-person-x"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <div class="avatar-sm bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-2">
-                                    A
-                                </div>
-                                <div>
-                                    <div class="fw-bold">Ana Silva</div>
-                                    <small class="text-muted">Fisioterapeuta</small>
-                                </div>
-                            </div>
-                        </td>
-                        <td><span class="badge bg-success">Osteopatia</span></td>
-                        <td>CREFITO: 789012/DF</td>
-                        <td>(61) 98765-4321</td>
-                        <td>ana@clinica.com</td>
-                        <td><span class="badge bg-success">Ativo</span></td>
-                        <td>
-                            <div class="btn-group">
-                                <button type="button" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-info">
-                                    <i class="bi bi-calendar"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-person-x"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
+                            </td>
+                        </tr>
+                    <% }) %>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalProfissional" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProfissionalTitle">Profissional</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formProfissional">
+                    <input type="hidden" name="id" id="prof_id" />
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Nome *</label>
+                            <input type="text" class="form-control" name="nome" id="prof_nome" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">CPF *</label>
+                            <input type="text" class="form-control" name="cpf" id="prof_cpf" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Especialidade</label>
+                            <input type="text" class="form-control" name="especialidade" id="prof_especialidade" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Registro Profissional</label>
+                            <input type="text" class="form-control" name="registro_profissional" id="prof_registro" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" class="form-control" name="telefone" id="prof_telefone" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" id="prof_email" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Contratação</label>
+                            <input type="date" class="form-control" name="data_contratacao" id="prof_data" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Salário</label>
+                            <input type="number" class="form-control" name="salario" id="prof_salario" min="0" step="0.01" />
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarProfissional">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setProfForm(data) {
+    document.getElementById('prof_id').value = data && data.id ? String(data.id) : '';
+    document.getElementById('prof_nome').value = data && data.nome ? String(data.nome) : '';
+    document.getElementById('prof_cpf').value = data && data.cpf ? String(data.cpf) : '';
+    document.getElementById('prof_especialidade').value = data && data.especialidade ? String(data.especialidade) : '';
+    document.getElementById('prof_registro').value = data && data.registro_profissional ? String(data.registro_profissional) : '';
+    document.getElementById('prof_telefone').value = data && data.telefone ? String(data.telefone) : '';
+    document.getElementById('prof_email').value = data && data.email ? String(data.email) : '';
+    document.getElementById('prof_data').value = data && data.data_contratacao ? String(data.data_contratacao).slice(0, 10) : '';
+    document.getElementById('prof_salario').value = data && data.salario != null ? String(data.salario) : '';
+}
+
+async function salvarProfissional() {
+    const form = document.getElementById('formProfissional');
+    if (!form) return;
+    const payload = {
+        id: document.getElementById('prof_id').value || null,
+        nome: document.getElementById('prof_nome').value,
+        cpf: document.getElementById('prof_cpf').value,
+        especialidade: document.getElementById('prof_especialidade').value,
+        registro_profissional: document.getElementById('prof_registro').value,
+        telefone: document.getElementById('prof_telefone').value,
+        email: document.getElementById('prof_email').value,
+        data_contratacao: document.getElementById('prof_data').value,
+        salario: document.getElementById('prof_salario').value
+    };
+
+    const resp = await fetch('/api/profissionais', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (data && data.success) {
+        location.reload();
+        return;
+    }
+    const msg = (data && (data.message || data.error)) ? (data.message || data.error) : 'Erro ao salvar';
+    if (window.app && app.utils && app.utils.showNotification) {
+        app.utils.showNotification(msg, 'danger');
+    } else {
+        alert(msg);
+    }
+}
+
+async function setProfAtivo(id, ativo) {
+    const resp = await fetch(`/api/profissionais/${id}/ativo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ ativo })
+    });
+    const data = await resp.json();
+    if (data && data.success) {
+        location.reload();
+        return;
+    }
+    const msg = (data && (data.message || data.error)) ? (data.message || data.error) : 'Erro ao alterar status';
+    if (window.app && app.utils && app.utils.showNotification) {
+        app.utils.showNotification(msg, 'danger');
+    } else {
+        alert(msg);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-action="profissional-novo"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            setProfForm(null);
+        });
+    });
+
+    document.querySelectorAll('[data-action="profissional-editar"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const modalEl = document.getElementById('modalProfissional');
+            const modal = modalEl && window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
+            setProfForm({
+                id: btn.getAttribute('data-id'),
+                nome: btn.getAttribute('data-nome'),
+                cpf: btn.getAttribute('data-cpf'),
+                especialidade: btn.getAttribute('data-especialidade'),
+                registro_profissional: btn.getAttribute('data-registro_profissional'),
+                telefone: btn.getAttribute('data-telefone'),
+                email: btn.getAttribute('data-email'),
+                data_contratacao: btn.getAttribute('data-data_contratacao'),
+                salario: btn.getAttribute('data-salario')
+            });
+            if (modal) modal.show();
+        });
+    });
+
+    document.querySelectorAll('[data-action="profissional-ativo"]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const id = btn.getAttribute('data-id');
+            const ativo = Number(btn.getAttribute('data-ativo'));
+            const ok = window.app && app.utils && app.utils.confirm ? await app.utils.confirm('Confirmar alteração de status do profissional?', { confirmVariant: 'warning' }) : confirm('Confirmar alteração de status do profissional?');
+            if (!ok) return;
+            setProfAtivo(id, ativo);
+        });
+    });
+
+    const btnSalvar = document.getElementById('btnSalvarProfissional');
+    if (btnSalvar) btnSalvar.addEventListener('click', salvarProfissional);
+});
+</script>

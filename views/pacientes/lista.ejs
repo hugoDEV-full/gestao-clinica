@@ -75,16 +75,18 @@
                                    class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar dados cadastrais do paciente (contato, convênio e informações gerais).">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                <% if (usuario && usuario.tipo !== 'secretaria') { %>
                                 <a href="/prontuarios/paciente/<%= paciente.id %>" 
                                    class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir prontuário do paciente: histórico clínico e evoluções.">
                                     <i class="bi bi-file-medical"></i>
                                 </a>
+                                <% } %>
                                 <button type="button" class="btn btn-sm btn-outline-success" 
                                         onclick="verAgendamentos('<%= paciente.id %>')" data-bs-toggle="tooltip" data-bs-placement="top" title="Ver agendamentos do paciente (consultas marcadas/realizadas).">
                                     <i class="bi bi-calendar"></i>
                                 </button>
                                 <form action="/pacientes/<%= paciente.id %>/excluir" method="POST" 
-                                      style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este paciente?')">
+                                      style="display: inline;" data-confirm-message="Tem certeza que deseja excluir este paciente?" data-confirm-title="Confirmação" data-confirm-confirm-text="Excluir" data-confirm-cancel-text="Cancelar" data-confirm-variant="danger">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir o cadastro do paciente (ação irreversível).">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -159,16 +161,81 @@ function filtrarPacientes() {
 function verAgendamentos(pacienteId) {
     const modal = new bootstrap.Modal(document.getElementById('modalAgendamentos'));
     const conteudo = document.getElementById('conteudoAgendamentos');
-    
-    // Simulação - na implementação real, buscaria via AJAX
+
     conteudo.innerHTML = `
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> 
-            Funcionalidade em desenvolvimento. Em breve será possível visualizar os agendamentos do paciente.
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
         </div>
     `;
-    
+
     modal.show();
+
+    fetch(`/api/pacientes/${encodeURIComponent(String(pacienteId))}/agendamentos`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data || !data.success) {
+                const msg = (data && data.message) ? data.message : 'Erro ao carregar agendamentos';
+                conteudo.innerHTML = `<div class="alert alert-danger" role="alert">${msg}</div>`;
+                return;
+            }
+
+            const ags = Array.isArray(data.agendamentos) ? data.agendamentos : [];
+            if (!ags.length) {
+                conteudo.innerHTML = `<div class="text-muted text-center py-3">Nenhum agendamento encontrado para este paciente.</div>`;
+                return;
+            }
+
+            const escapeHtml = (s) => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+
+            const fmtDt = (v) => {
+                try {
+                    const d = new Date(v);
+                    if (isNaN(d.getTime())) return escapeHtml(v);
+                    return d.toLocaleString('pt-BR');
+                } catch {
+                    return escapeHtml(v);
+                }
+            };
+
+            conteudo.innerHTML = `
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Profissional</th>
+                                <th>Tipo</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ags.map(a => {
+                                const st = String(a.status || '').toLowerCase();
+                                const badge = st === 'confirmado' ? 'bg-success' : (st === 'cancelado' ? 'bg-danger' : (st === 'realizado' ? 'bg-secondary' : 'bg-warning'));
+                                return `
+                                    <tr>
+                                        <td>${fmtDt(a.data_hora)}</td>
+                                        <td>${escapeHtml(a.profissional_nome || '-')}</td>
+                                        <td>${escapeHtml(a.tipo_consulta || '-')}</td>
+                                        <td><span class="badge ${badge}">${escapeHtml(a.status || 'agendado')}</span></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        })
+        .catch(err => {
+            conteudo.innerHTML = `<div class="alert alert-danger" role="alert">Erro ao carregar agendamentos: ${String(err && err.message ? err.message : err)}</div>`;
+        });
 }
 
 // Event listeners

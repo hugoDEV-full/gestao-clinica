@@ -347,16 +347,25 @@ function verLembrete(id) {
         .catch(err => {
             console.error(err);
             conteudo.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    ${err.message || 'Erro ao carregar lembrete'}
+                <div class="alert alert-danger" role="alert">
+                    ${window.app && window.app.utils ? window.app.utils.buildAlertHtml('error', (err.message || 'Erro ao carregar lembrete')) : (err.message || 'Erro ao carregar lembrete')}
                 </div>
             `;
         });
 }
 
 function enviarLembrete(id) {
-    if (confirm('Deseja enviar este lembrete agora?')) {
+    const confirmFn = (window.app && window.app.utils && window.app.utils.confirm)
+        ? (opts) => window.app.utils.confirm('Deseja enviar este lembrete agora?', opts)
+        : (opts) => Promise.resolve(confirm('Deseja enviar este lembrete agora?'));
+
+    confirmFn({
+        title: 'Confirmação',
+        confirmText: 'Enviar agora',
+        cancelText: 'Cancelar',
+        confirmVariant: 'primary'
+    }).then((ok) => {
+        if (!ok) return;
         fetch('/lembretes/' + id + '/enviar', {
             method: 'POST',
             headers: {
@@ -366,21 +375,37 @@ function enviarLembrete(id) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Lembrete enviado com sucesso!');
+                if (window.app && window.app.utils && window.app.utils.showNotification) {
+                    window.app.utils.showNotification('Lembrete enviado com sucesso!', 'success');
+                }
                 location.reload();
             } else {
-                alert('Erro ao enviar lembrete: ' + data.message);
+                if (window.app && window.app.utils && window.app.utils.showNotification) {
+                    window.app.utils.showNotification('Erro ao enviar lembrete: ' + data.message, 'error');
+                }
             }
         })
         .catch(error => {
             console.error('Erro:', error);
-            alert('Erro ao enviar lembrete');
+            if (window.app && window.app.utils && window.app.utils.showNotification) {
+                window.app.utils.showNotification('Erro ao enviar lembrete', 'error');
+            }
         });
-    }
+    });
 }
 
 function excluirLembrete(id) {
-    if (confirm('Tem certeza que deseja excluir este lembrete?')) {
+    const confirmFn = (window.app && window.app.utils && window.app.utils.confirm)
+        ? (opts) => window.app.utils.confirm('Tem certeza que deseja excluir este lembrete?', opts)
+        : (opts) => Promise.resolve(confirm('Tem certeza que deseja excluir este lembrete?'));
+
+    confirmFn({
+        title: 'Confirmação',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar',
+        confirmVariant: 'danger'
+    }).then((ok) => {
+        if (!ok) return;
         fetch('/lembretes/' + id + '/excluir', {
             method: 'POST',
             headers: {
@@ -390,16 +415,22 @@ function excluirLembrete(id) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Lembrete excluído com sucesso!');
+                if (window.app && window.app.utils && window.app.utils.showNotification) {
+                    window.app.utils.showNotification('Lembrete excluído com sucesso!', 'success');
+                }
                 location.reload();
             } else {
-                alert('Erro ao excluir lembrete: ' + data.message);
+                if (window.app && window.app.utils && window.app.utils.showNotification) {
+                    window.app.utils.showNotification('Erro ao excluir lembrete: ' + data.message, 'error');
+                }
             }
         })
         .catch(error => {
             console.error('Erro:', error);
-            alert('Erro ao excluir lembrete');
+            if (window.app && window.app.utils && window.app.utils.showNotification) {
+                window.app.utils.showNotification('Erro ao excluir lembrete', 'error');
+            }
         });
-    }
+    });
 }
 </script>

@@ -1,0 +1,184 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-shield-check"></i> Acessos (QR)</h3>
+    <a class="btn btn-outline-secondary" href="/acessos/export?<%= new URLSearchParams({ q: filtros?.q || '', status: filtros?.status || '', tipo: filtros?.tipo || '' }).toString() %>" title="Exportar acessos em CSV" data-bs-toggle="tooltip">
+        <i class="bi bi-download"></i> Exportar CSV
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0"><i class="bi bi-bar-chart"></i> Acessos na semana</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="acessosChart" height="120"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const chartData = <%- JSON.stringify(chart || { dias: [], series: {} }) %>;
+const labels = (chartData && chartData.dias) ? chartData.dias.map(d => {
+    try {
+        const dt = new Date(d);
+        return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    } catch {
+        return d;
+    }
+}) : [];
+const ctx = document.getElementById('acessosChart');
+if (ctx && chartData && chartData.series) {
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Autorizado',
+                    data: chartData.series.autorizado || [],
+                    backgroundColor: 'rgba(25, 135, 84, 0.5)'
+                },
+                {
+                    label: 'Restrito',
+                    data: chartData.series.restrito || [],
+                    backgroundColor: 'rgba(255, 193, 7, 0.6)'
+                },
+                {
+                    label: 'Negado',
+                    data: chartData.series.negado || [],
+                    backgroundColor: 'rgba(220, 53, 69, 0.6)'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+}
+
+async function alterarStatus(id, status) {
+    try {
+        const resp = await fetch(`/api/colaboradores/${id}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ status })
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok || !json.success) throw new Error(json.message || 'Erro ao atualizar status');
+        window.location.reload();
+    } catch (e) {
+        alert(e.message || 'Erro ao atualizar status');
+    }
+}
+</script>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="/acessos">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Buscar</label>
+                    <input type="text" class="form-control" name="q" value="<%= filtros?.q || '' %>" placeholder="Nome, CPF, motivo...">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status">
+                        <option value="" <%= !filtros?.status ? 'selected' : '' %>>Todos</option>
+                        <option value="autorizado" <%= filtros?.status === 'autorizado' ? 'selected' : '' %>>Autorizado</option>
+                        <option value="restrito" <%= filtros?.status === 'restrito' ? 'selected' : '' %>>Restrito</option>
+                        <option value="negado" <%= filtros?.status === 'negado' ? 'selected' : '' %>>Negado</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select" name="tipo">
+                        <option value="" <%= !filtros?.tipo ? 'selected' : '' %>>Todos</option>
+                        <option value="acesso" <%= filtros?.tipo === 'acesso' ? 'selected' : '' %>>Acesso</option>
+                        <option value="ponto" <%= filtros?.tipo === 'ponto' ? 'selected' : '' %>>Ponto</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Limite</label>
+                    <select class="form-select" name="limit">
+                        <option value="100" <%= String(filtros?.limit || '') === '100' ? 'selected' : '' %>>100</option>
+                        <option value="200" <%= !filtros?.limit || String(filtros?.limit) === '200' ? 'selected' : '' %>>200</option>
+                        <option value="500" <%= String(filtros?.limit) === '500' ? 'selected' : '' %>>500</option>
+                        <option value="1000" <%= String(filtros?.limit) === '1000' ? 'selected' : '' %>>1000</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a href="/acessos" class="btn btn-outline-secondary" title="Limpar filtros" data-bs-toggle="tooltip"><i class="bi bi-x-circle"></i> Limpar</a>
+                    <button type="submit" class="btn btn-outline-secondary" title="Aplicar filtros" data-bs-toggle="tooltip"><i class="bi bi-funnel"></i> Filtrar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Colaborador</th>
+                        <th>Status</th>
+                        <th>Tipo</th>
+                        <th>Motivo</th>
+                        <th>Local</th>
+                        <th>IP</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!logs || logs.length === 0) { %>
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">Nenhum acesso encontrado.</td>
+                        </tr>
+                    <% } %>
+                    <% (logs || []).forEach((l) => { %>
+                        <tr>
+                            <td><%= l.created_at ? moment(l.created_at).format('DD/MM/YYYY HH:mm:ss') : '-' %></td>
+                            <td>
+                                <div class="fw-semibold"><%= l.colaborador_nome || 'Visitante' %></div>
+                                <small class="text-muted"><%= l.colaborador_cpf || '-' %></small>
+                            </td>
+                            <td>
+                                <% if (l.status === 'autorizado') { %>
+                                    <span class="badge bg-success">Autorizado</span>
+                                <% } else if (l.status === 'restrito') { %>
+                                    <span class="badge bg-warning text-dark">Restrito</span>
+                                <% } else { %>
+                                    <span class="badge bg-danger">Negado</span>
+                                <% } %>
+                            </td>
+                            <td><%= l.tipo || '-' %></td>
+                            <td><%= l.motivo || '-' %></td>
+                            <td><%= l.local || '-' %></td>
+                            <td><%= l.ip_address || '-' %></td>
+                            <td>
+                                <% if (l.colaborador_id) { %>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-success" onclick="alterarStatus('<%= l.colaborador_id %>', 'ativo')" title="Ativar colaborador" data-bs-toggle="tooltip">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-warning" onclick="alterarStatus('<%= l.colaborador_id %>', 'inativo')" title="Inativar colaborador" data-bs-toggle="tooltip">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger" onclick="alterarStatus('<%= l.colaborador_id %>', 'bloqueado')" title="Bloquear colaborador" data-bs-toggle="tooltip">
+                                            <i class="bi bi-slash-circle"></i>
+                                        </button>
+                                    </div>
+                                <% } else { %>
+                                    -
+                                <% } %>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

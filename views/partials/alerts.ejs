@@ -1,0 +1,26 @@
+<% const _success = (typeof success !== 'undefined') ? success : null; %>
+<% const _error = (typeof error !== 'undefined') ? error : null; %>
+<% const _info = (typeof info !== 'undefined') ? info : null; %>
+<% const _warning = (typeof warning !== 'undefined') ? warning : null; %>
+
+<% const items = [
+    { key: 'success', value: _success, klass: 'success', icon: 'bi-check-circle', label: 'Sucesso' },
+    { key: 'error', value: _error, klass: 'danger', icon: 'bi-exclamation-triangle', label: 'Erro' },
+    { key: 'warning', value: _warning, klass: 'warning', icon: 'bi-exclamation-circle', label: 'Atenção' },
+    { key: 'info', value: _info, klass: 'info', icon: 'bi-info-circle', label: 'Informação' }
+]; %>
+
+<% items.forEach(item => { %>
+    <% if (item.value) { %>
+        <div class="alert alert-<%= item.klass %> alert-dismissible fade show" role="alert">
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi <%= item.icon %>"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold"><%= item.label %></div>
+                    <div><%= item.value %></div>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <% } %>
+<% }) %>

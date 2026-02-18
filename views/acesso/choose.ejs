@@ -1,0 +1,129 @@
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header text-center">
+                    <h4 class="mb-0"><i class="bi bi-qr-code"></i> QR Code</h4>
+                </div>
+                <div class="card-body">
+                    <% const isAtivo = !!(colaborador && (colaborador.status || '').toString().toLowerCase() === 'ativo'); %>
+                    <div class="alert alert-info" role="alert">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-info-circle"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">Escolha o que você deseja fazer</div>
+                                <div>
+                                    <strong>Controle de Acesso</strong> verifica se a entrada está liberada.
+                                    <strong>Marcar Ponto</strong> registra entrada/saída.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <% if (colaborador) { %>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <% if (colaborador.foto_url) { %>
+                                <img src="<%= colaborador.foto_url %>" class="rounded-circle" style="width:64px; height:64px; object-fit:cover;" alt="Foto">
+                            <% } else { %>
+                                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:64px; height:64px; font-size:24px;">
+                                    <%= (colaborador.nome || 'C').toString().trim().slice(0,1).toUpperCase() %>
+                                </div>
+                            <% } %>
+                            <div>
+                                <div class="fw-bold"><%= colaborador.nome || 'Colaborador' %></div>
+                                <div class="small text-muted">CPF: <%= colaborador.cpf || '-' %></div>
+                                <div class="small text-muted"><%= colaborador.empresa || '-' %> • <%= colaborador.cargo || '-' %></div>
+                            </div>
+                        </div>
+                    <% } else { %>
+                        <div class="alert alert-warning" role="alert">
+                            QR não identificado. Mesmo assim, você pode tentar uma opção abaixo.
+                        </div>
+                    <% } %>
+
+                    <% if (colaborador && !isAtivo) { %>
+                        <div class="alert alert-warning" role="alert">
+                            <div class="d-flex align-items-start gap-2">
+                                <i class="bi bi-shield-exclamation"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">Colaborador não está ativo</div>
+                                    <div>
+                                        A opção <strong>Marcar Ponto</strong> fica indisponível. Regularize o status do colaborador para liberar.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <a class="text-decoration-none" href="/qr/<%= encodeURIComponent(token || '') %>/acesso">
+                                <div class="card h-100 border-primary shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-start gap-3">
+                                            <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:44px; height:44px;">
+                                                <i class="bi bi-door-open" style="font-size:20px;"></i>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <div class="fw-bold text-primary">Controle de Acesso</div>
+                                                <div class="text-muted small">Verifica se a entrada está autorizada e registra o evento de acesso.</div>
+                                            </div>
+                                            <div class="text-muted"><i class="bi bi-chevron-right"></i></div>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer bg-primary bg-opacity-10 border-0">
+                                        <span class="badge text-bg-primary">Entrada</span>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <% if (isAtivo) { %>
+                                <a class="text-decoration-none" href="/qr/<%= encodeURIComponent(token || '') %>/ponto">
+                                    <div class="card h-100 border-success shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-start gap-3">
+                                                <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:44px; height:44px;">
+                                                    <i class="bi bi-clock" style="font-size:20px;"></i>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-bold text-success">Marcar Ponto</div>
+                                                    <div class="text-muted small">Registra <strong>Entrada</strong> ou <strong>Saída</strong> e salva no controle de ponto.</div>
+                                                </div>
+                                                <div class="text-muted"><i class="bi bi-chevron-right"></i></div>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer bg-success bg-opacity-10 border-0">
+                                            <span class="badge text-bg-success">Entrada / Saída</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            <% } else { %>
+                                <div class="card h-100 border-secondary bg-light">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-start gap-3">
+                                            <div class="bg-secondary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:44px; height:44px;">
+                                                <i class="bi bi-clock" style="font-size:20px;"></i>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <div class="fw-bold text-secondary">Marcar Ponto</div>
+                                                <div class="text-muted small">Indisponível (colaborador não ativo).</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer bg-secondary bg-opacity-10 border-0">
+                                        <span class="badge text-bg-secondary">Bloqueado</span>
+                                    </div>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer text-center text-muted small">
+                    Atualizado em <%= moment().format('DD/MM/YYYY HH:mm:ss') %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

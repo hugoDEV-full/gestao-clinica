@@ -1,0 +1,321 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-person-badge"></i> <%= colaborador?.nome || 'Colaborador' %></h3>
+        <div class="text-muted">CPF: <%= colaborador?.cpf || '-' %></div>
+    </div>
+    <a href="/colaboradores" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <% if (colaborador?.foto_url) { %>
+                    <img src="<%= colaborador.foto_url %>" class="rounded-circle mb-3" style="width:120px; height:120px; object-fit:cover;" alt="Foto">
+                <% } else { %>
+                    <div class="avatar-sm bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:120px; height:120px; font-size:40px;">
+                        <%= (colaborador?.nome || 'C').toString().trim().slice(0,1).toUpperCase() %>
+                    </div>
+                <% } %>
+                <h5 class="mb-1"><%= colaborador?.nome || '-' %></h5>
+                <div class="text-muted mb-2"><%= colaborador?.cargo || 'Cargo não informado' %></div>
+                <div class="mb-3">
+                    <% const st = (colaborador?.status || '').toString(); %>
+                    <% if (st === 'ativo') { %>
+                        <span class="badge bg-success">Ativo</span>
+                    <% } else if (st === 'inativo') { %>
+                        <span class="badge bg-warning text-dark">Inativo</span>
+                    <% } else { %>
+                        <span class="badge bg-danger">Bloqueado</span>
+                    <% } %>
+                </div>
+                <div class="text-muted">Empresa/Local: <%= colaborador?.empresa || '-' %></div>
+                <div class="text-muted">Cadastro: <%= colaborador?.created_at ? moment(colaborador.created_at).format('DD/MM/YYYY HH:mm') : '-' %></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-shield-check"></i> Últimos acessos</h5>
+                <a class="btn btn-outline-secondary btn-sm" href="/acessos?<%= new URLSearchParams({ q: colaborador?.cpf || colaborador?.nome || '', tipo: 'acesso', limit: 500 }).toString() %>">
+                    <i class="bi bi-list-ul"></i> Ver relatório completo
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Status</th>
+                                <th>Tipo</th>
+                                <th>Motivo</th>
+                                <th>Local</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!logs || logs.length === 0) { %>
+                                <tr><td colspan="5" class="text-center text-muted py-3">Sem registros.</td></tr>
+                            <% } %>
+                            <% (logs || []).forEach((l) => { %>
+                                <tr>
+                                    <td><%= l.created_at ? moment(l.created_at).format('DD/MM/YYYY HH:mm:ss') : '-' %></td>
+                                    <td>
+                                        <% if (l.status === 'autorizado') { %>
+                                            <span class="badge bg-success">Autorizado</span>
+                                        <% } else if (l.status === 'restrito') { %>
+                                            <span class="badge bg-warning text-dark">Restrito</span>
+                                        <% } else { %>
+                                            <span class="badge bg-danger">Negado</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= l.tipo || '-' %></td>
+                                    <td><%= l.motivo || '-' %></td>
+                                    <td><%= l.local || '-' %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-clock"></i> Registros de ponto</h5>
+                <a class="btn btn-outline-secondary btn-sm" href="/acessos?<%= new URLSearchParams({ q: colaborador?.cpf || colaborador?.nome || '', tipo: 'ponto', limit: 500 }).toString() %>">
+                    <i class="bi bi-list-ul"></i> Ver relatório completo
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Tipo</th>
+                                <th>Device</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!pontos || pontos.length === 0) { %>
+                                <tr><td colspan="3" class="text-center text-muted py-3">Sem registros.</td></tr>
+                            <% } %>
+                            <% (pontos || []).forEach((p) => { %>
+                                <tr>
+                                    <td><%= p.created_at ? moment(p.created_at).format('DD/MM/YYYY HH:mm:ss') : '-' %></td>
+                                    <td><%= p.tipo || '-' %></td>
+                                    <td><%= p.device_id || '-' %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-phone"></i> Devices autorizados</h5>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddDevice">Adicionar device</button>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                    <div class="text-muted small">Device atual:</div>
+                    <code id="currentDeviceId" class="bg-light px-2 py-1 rounded">-</code>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCopyDevice">Copiar</button>
+                </div>
+                <div id="deviceAlert" class="alert d-none" role="alert"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle" id="deviceTable">
+                        <thead>
+                            <tr>
+                                <th>Device ID</th>
+                                <th>Label</th>
+                                <th>Último uso</th>
+                                <th>Cadastrado em</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="5" class="text-center text-muted py-3">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDevice" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar device</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formDevice">
+                    <div class="mb-3">
+                        <label class="form-label">Device ID *</label>
+                        <input type="text" class="form-control" name="deviceId" required placeholder="Ex: 3b1a-...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Label</label>
+                        <input type="text" class="form-control" name="label" placeholder="Ex: Recepção, Tablet Sala 1">
+                    </div>
+                </form>
+                <small class="text-muted">Use o deviceId exibido no navegador do ponto.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSaveDevice">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const colaboradorId = "<%= (colaborador && colaborador.id) ? colaborador.id : '' %>";
+    const tableBody = document.querySelector('#deviceTable tbody');
+    const alertBox = document.getElementById('deviceAlert');
+    const modalEl = document.getElementById('modalDevice');
+    const btnAdd = document.getElementById('btnAddDevice');
+    const btnSave = document.getElementById('btnSaveDevice');
+    const form = document.getElementById('formDevice');
+    const currentDeviceEl = document.getElementById('currentDeviceId');
+    const btnCopyDevice = document.getElementById('btnCopyDevice');
+
+    const DEVICE_ID_KEY = 'pontoDeviceId';
+
+    function getDeviceId() {
+        try {
+            const stored = window.localStorage ? window.localStorage.getItem(DEVICE_ID_KEY) : null;
+            return stored || '';
+        } catch {
+            return '';
+        }
+    }
+
+    function showAlert(type, msg) {
+        if (!alertBox) return;
+        const map = { success: 'success', danger: 'danger', warning: 'warning', info: 'info' };
+        alertBox.className = `alert alert-${map[type] || 'danger'} alert-dismissible fade show`;
+        alertBox.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        alertBox.classList.remove('d-none');
+    }
+
+    async function loadDevices() {
+        if (!tableBody || !colaboradorId) return;
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Carregando...</td></tr>';
+        try {
+            const resp = await fetch(`/api/colaboradores/${colaboradorId}/devices`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await resp.json();
+            if (!data || !data.success) throw new Error(data.message || 'Erro ao carregar devices');
+            const devices = Array.isArray(data.devices) ? data.devices : [];
+            if (!devices.length) {
+                tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum device cadastrado.</td></tr>';
+                return;
+            }
+            tableBody.innerHTML = devices.map((d) => `
+                <tr>
+                    <td>${d.device_id || '-'}</td>
+                    <td>${d.label || '-'}</td>
+                    <td>${d.last_seen ? new Date(d.last_seen).toLocaleString('pt-BR') : '-'}</td>
+                    <td>${d.created_at ? new Date(d.created_at).toLocaleString('pt-BR') : '-'}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-danger" data-device-id="${d.device_id}">Remover</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Erro ao carregar devices.</td></tr>';
+        }
+    }
+
+    if (btnAdd) {
+        btnAdd.addEventListener('click', () => {
+            if (form) form.reset();
+            const modal = window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
+            if (modal) modal.show();
+        });
+    }
+
+    if (btnSave) {
+        btnSave.addEventListener('click', async () => {
+            if (!form || !colaboradorId) return;
+            const deviceId = form.elements.deviceId.value.trim();
+            const label = form.elements.label.value.trim();
+            if (!deviceId) return showAlert('warning', 'Device ID é obrigatório.');
+            try {
+                const resp = await fetch(`/api/colaboradores/${colaboradorId}/devices`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ deviceId, label })
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data.success) throw new Error(data.message || 'Erro ao cadastrar device');
+                showAlert('success', 'Device cadastrado com sucesso.');
+                loadDevices();
+                const modal = window.bootstrap ? window.bootstrap.Modal.getInstance(modalEl) : null;
+                if (modal) modal.hide();
+            } catch (e) {
+                showAlert('danger', e.message || 'Erro ao cadastrar device');
+            }
+        });
+    }
+
+    if (tableBody) {
+        tableBody.addEventListener('click', async (e) => {
+            const btn = e.target && e.target.matches('button[data-device-id]') ? e.target : null;
+            if (!btn) return;
+            const deviceId = btn.getAttribute('data-device-id');
+            if (!deviceId) return;
+            const ok = window.confirm('Remover device autorizado?');
+            if (!ok) return;
+            try {
+                const resp = await fetch(`/api/colaboradores/${colaboradorId}/devices/${encodeURIComponent(deviceId)}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data.success) throw new Error(data.message || 'Erro ao remover device');
+                showAlert('success', 'Device removido.');
+                loadDevices();
+            } catch (err) {
+                showAlert('danger', err.message || 'Erro ao remover device');
+            }
+        });
+    }
+
+    if (currentDeviceEl) {
+        const devId = getDeviceId();
+        currentDeviceEl.textContent = devId || '-';
+    }
+    if (btnCopyDevice) {
+        btnCopyDevice.addEventListener('click', async () => {
+            const devId = getDeviceId();
+            if (!devId) return showAlert('warning', 'Device ID não encontrado neste navegador.');
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(devId);
+                } else {
+                    const tmp = document.createElement('input');
+                    tmp.value = devId;
+                    document.body.appendChild(tmp);
+                    tmp.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tmp);
+                }
+                showAlert('success', 'Device ID copiado.');
+            } catch (e) {
+                showAlert('danger', 'Não foi possível copiar o Device ID.');
+            }
+        });
+    }
+
+    loadDevices();
+})();
+</script>

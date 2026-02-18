@@ -5,13 +5,40 @@
     </button>
 </div>
 
-<% const listaUsuarios = Array.isArray(usuarios) ? usuarios : []; %>
-
-<% if (typeof error !== 'undefined' && error) { %>
-<div class="alert alert-danger" role="alert">
-    <i class="bi bi-exclamation-triangle"></i> <%= error %>
+<!-- Modal Alterar Permissão (Tipo) -->
+<div class="modal fade" id="modalTipoUsuario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Alterar Permissão do Usuário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="tipoUsuarioId" />
+                <div class="mb-3">
+                    <label class="form-label">Senha do Admin (confirmação) *</label>
+                    <input type="password" class="form-control" id="tipoAdminSenha" autocomplete="current-password" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tipo (papel) *</label>
+                    <select class="form-select" id="tipoUsuarioSelect">
+                        <option value="admin">Administrador</option>
+                        <option value="secretaria">Secretária</option>
+                        <option value="medico">Médico</option>
+                        <option value="paciente">Paciente</option>
+                    </select>
+                    <small class="text-muted">Isso altera as permissões de acesso do usuário no sistema.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarTipoUsuario">Salvar</button>
+            </div>
+        </div>
+    </div>
 </div>
-<% } %>
+
+<% const listaUsuarios = Array.isArray(usuarios) ? usuarios : []; %>
 
 <div id="usuariosAlert" class="alert d-none" role="alert"></div>
 
@@ -63,8 +90,15 @@
                         </td>
                         <td><%= u.email %></td>
                         <td>
-                            <% if (u.tipo === 'admin') { %>
+                            <% const tipo = (u.tipo || '').toString().trim().toLowerCase(); %>
+                            <% if (tipo === 'admin') { %>
                                 <span class="badge bg-danger">Administrador</span>
+                            <% } else if (tipo === 'medico') { %>
+                                <span class="badge bg-primary">Médico</span>
+                            <% } else if (tipo === 'secretaria') { %>
+                                <span class="badge bg-secondary">Secretária</span>
+                            <% } else if (tipo === 'paciente') { %>
+                                <span class="badge bg-info text-dark">Paciente</span>
                             <% } else { %>
                                 <span class="badge bg-secondary"><%= u.tipo %></span>
                             <% } %>
@@ -80,9 +114,18 @@
                         </td>
                         <td>
                             <div class="btn-group">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Ações em desenvolvimento">
-                                    <i class="bi bi-gear"></i>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Alterar permissão (tipo)" data-user-id="<%= u.id %>" data-user-tipo="<%= (u.tipo || '').toString() %>" onclick="openTipoModalFromBtn(this)">
+                                    <i class="bi bi-shield-lock"></i>
                                 </button>
+                                <% if (u.ativo) { %>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Inativar usuário" onclick="toggleUsuarioAtivo('<%= u.id %>', 0)">
+                                        <i class="bi bi-person-x"></i>
+                                    </button>
+                                <% } else { %>
+                                    <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Ativar usuário" onclick="toggleUsuarioAtivo('<%= u.id %>', 1)">
+                                        <i class="bi bi-person-check"></i>
+                                    </button>
+                                <% } %>
                             </div>
                         </td>
                     </tr>
@@ -164,16 +207,115 @@
         const form = document.getElementById('novoUsuarioForm');
         const btn = document.getElementById('btnCadastrarUsuario');
         const modalEl = document.getElementById('modalUsuario');
+        const tipoModalEl = document.getElementById('modalTipoUsuario');
+        const tipoUsuarioIdEl = document.getElementById('tipoUsuarioId');
+        const tipoAdminSenhaEl = document.getElementById('tipoAdminSenha');
+        const tipoSelectEl = document.getElementById('tipoUsuarioSelect');
+        const btnSalvarTipo = document.getElementById('btnSalvarTipoUsuario');
 
         function showAlert(type, msg) {
             if (!alertBox) return;
-            alertBox.className = `alert alert-${type}`;
-            alertBox.textContent = msg;
+            const map = {
+                success: { klass: 'success', icon: 'bi-check-circle', label: 'Sucesso' },
+                danger: { klass: 'danger', icon: 'bi-exclamation-triangle', label: 'Erro' },
+                warning: { klass: 'warning', icon: 'bi-exclamation-circle', label: 'Atenção' },
+                info: { klass: 'info', icon: 'bi-info-circle', label: 'Informação' }
+            };
+            const m = map[type] || map.danger;
+            alertBox.className = `alert alert-${m.klass} alert-dismissible fade show`;
+            alertBox.innerHTML = `
+                <div class="d-flex align-items-start gap-2">
+                    <i class="bi ${m.icon}"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">${m.label}</div>
+                        <div>${String(msg || '').replace(/</g, '&lt;')}</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
             alertBox.classList.remove('d-none');
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         if (!btn || !form) return;
+
+        window.openTipoModal = function (id, tipoAtual) {
+            if (!tipoModalEl || !tipoUsuarioIdEl || !tipoAdminSenhaEl || !tipoSelectEl) return;
+            tipoUsuarioIdEl.value = String(id || '');
+            tipoAdminSenhaEl.value = '';
+            tipoSelectEl.value = (tipoAtual || '').toString().trim().toLowerCase() || 'secretaria';
+
+            const modal = window.bootstrap ? new window.bootstrap.Modal(tipoModalEl) : null;
+            if (modal) modal.show();
+        };
+
+        window.openTipoModalFromBtn = function (btnEl) {
+            try {
+                const el = btnEl;
+                const id = el && el.dataset ? el.dataset.userId : '';
+                const tipo = el && el.dataset ? el.dataset.userTipo : '';
+                return window.openTipoModal(id, tipo);
+            } catch {
+                return;
+            }
+        };
+
+        if (btnSalvarTipo) {
+            btnSalvarTipo.addEventListener('click', async () => {
+                const uid = Number(tipoUsuarioIdEl?.value);
+                const adminSenha = (tipoAdminSenhaEl?.value || '').toString();
+                const tipo = (tipoSelectEl?.value || '').toString();
+                if (!uid || !adminSenha || !tipo) {
+                    return showAlert('danger', 'Informe a senha do admin e selecione o tipo.');
+                }
+
+                btnSalvarTipo.disabled = true;
+                try {
+                    const resp = await fetch(`/api/usuarios/${uid}/tipo`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        body: JSON.stringify({ adminSenha, tipo })
+                    });
+                    const json = await resp.json().catch(() => ({}));
+                    if (!resp.ok || !json.success) {
+                        throw new Error(json.message || 'Erro ao atualizar permissão');
+                    }
+
+                    showAlert('success', 'Permissão atualizada com sucesso.');
+                    try {
+                        const m = window.bootstrap ? window.bootstrap.Modal.getInstance(tipoModalEl) : null;
+                        if (m) m.hide();
+                    } catch {}
+                    setTimeout(() => window.location.reload(), 500);
+                } catch (e) {
+                    showAlert('danger', e.message || 'Erro ao atualizar permissão');
+                } finally {
+                    btnSalvarTipo.disabled = false;
+                }
+            });
+        }
+
+        window.toggleUsuarioAtivo = async function (id, ativo) {
+            const uid = Number(id);
+            const ativoNum = Number(ativo);
+            if (!uid || (ativoNum !== 0 && ativoNum !== 1)) return;
+
+            try {
+                const resp = await fetch(`/api/usuarios/${uid}/ativo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ ativo: ativoNum })
+                });
+                const json = await resp.json().catch(() => ({}));
+                if (!resp.ok || !json.success) {
+                    throw new Error(json.message || 'Erro ao atualizar usuário');
+                }
+                showAlert('success', 'Usuário atualizado com sucesso.');
+                setTimeout(() => window.location.reload(), 400);
+            } catch (e) {
+                showAlert('danger', e.message || 'Erro ao atualizar usuário');
+            }
+        };
 
         btn.addEventListener('click', async () => {
             const data = Object.fromEntries(new FormData(form).entries());

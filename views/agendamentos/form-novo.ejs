@@ -7,13 +7,6 @@
 
 <div class="card">
     <div class="card-body">
-        <% if (typeof error !== 'undefined' && error) { %>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-triangle"></i> <%= error %>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        <% } %>
-        
         <form action="/agendamentos" method="POST">
             <div class="row g-3">
                 <div class="col-md-6">

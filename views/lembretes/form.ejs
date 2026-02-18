@@ -8,12 +8,6 @@
     </a>
 </div>
 
-<% if (error) { %>
-<div class="alert alert-danger">
-    <i class="bi bi-exclamation-triangle"></i> <%= error %>
-</div>
-<% } %>
-
 <div class="card">
     <div class="card-body">
         <form method="POST" action="<%= lembrete ? ('/lembretes/' + lembrete.id + '/editar') : '/lembretes' %>">
@@ -49,6 +43,7 @@
                         <option value="consulta" <%= tipoAtual === 'consulta' ? 'selected' : '' %>>Consulta</option>
                         <option value="pagamento" <%= tipoAtual === 'pagamento' ? 'selected' : '' %>>Pagamento</option>
                         <option value="exame" <%= tipoAtual === 'exame' ? 'selected' : '' %>>Exame</option>
+                        <option value="aniversario" <%= tipoAtual === 'aniversario' ? 'selected' : '' %>>Aniversário</option>
                         <option value="outro" <%= tipoAtual === 'outro' ? 'selected' : '' %>>Outro</option>
                     </select>
                 </div>

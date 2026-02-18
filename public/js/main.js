@@ -26,6 +26,34 @@ window.app = {
 
     // Utilitários
     utils: {
+        getAlertMeta: function(type) {
+            const t = (type || 'info').toString().toLowerCase();
+            if (t === 'error' || t === 'danger') {
+                return { bsType: 'danger', icon: 'bi-exclamation-triangle', label: 'Erro' };
+            }
+            if (t === 'warn' || t === 'warning') {
+                return { bsType: 'warning', icon: 'bi-exclamation-circle', label: 'Atenção' };
+            }
+            if (t === 'success') {
+                return { bsType: 'success', icon: 'bi-check-circle', label: 'Sucesso' };
+            }
+            return { bsType: 'info', icon: 'bi-info-circle', label: 'Informação' };
+        },
+
+        buildAlertHtml: function(type, message) {
+            const meta = app.utils.getAlertMeta(type);
+            const msg = (message == null) ? '' : String(message);
+            return `
+                <div class="d-flex align-items-start gap-2">
+                    <i class="bi ${meta.icon}"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">${meta.label}</div>
+                        <div>${msg}</div>
+                    </div>
+                </div>
+            `;
+        },
+
         // Formatar data
         formatDate: function(date, format = 'DD/MM/YYYY') {
             return moment(date).format(format);
@@ -132,19 +160,12 @@ window.app = {
 
         // Mostrar notificação
         showNotification: function(message, type, duration) {
-            let bsType = type || 'info';
-            if (bsType === 'error') bsType = 'danger';
-            if (bsType === 'warn') bsType = 'warning';
-            if (bsType === 'success' || bsType === 'info' || bsType === 'warning' || bsType === 'danger' || bsType === 'primary' || bsType === 'secondary' || bsType === 'light' || bsType === 'dark') {
-                // ok
-            } else {
-                bsType = 'info';
-            }
+            const meta = app.utils.getAlertMeta(type);
             const notification = document.createElement('div');
-            notification.className = `alert alert-${bsType} alert-dismissible fade show position-fixed`;
+            notification.className = `alert alert-${meta.bsType} alert-dismissible fade show position-fixed`;
             notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
             notification.innerHTML = `
-                ${message}
+                ${app.utils.buildAlertHtml(type, message)}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             
@@ -160,10 +181,115 @@ window.app = {
         },
 
         // Confirmar ação
-        confirmAction: function(message, callback) {
-            if (confirm(message)) {
-                callback();
-            }
+        confirm: function(message, options = {}) {
+            const msg = (message == null) ? '' : String(message);
+            const title = (options && options.title != null) ? String(options.title) : 'Confirmação';
+            const confirmText = (options && options.confirmText != null) ? String(options.confirmText) : 'Confirmar';
+            const cancelText = (options && options.cancelText != null) ? String(options.cancelText) : 'Cancelar';
+            const confirmVariant = (options && options.confirmVariant != null) ? String(options.confirmVariant) : 'primary';
+
+            return new Promise((resolve) => {
+                try {
+                    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+                        resolve(confirm(msg));
+                        return;
+                    }
+
+                    let modalEl = document.getElementById('globalConfirmModal');
+                    if (!modalEl) {
+                        modalEl = document.createElement('div');
+                        modalEl.id = 'globalConfirmModal';
+                        modalEl.className = 'modal fade';
+                        modalEl.tabIndex = -1;
+                        modalEl.setAttribute('aria-hidden', 'true');
+                        modalEl.innerHTML = `
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="globalConfirmModalTitle">${title}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body" id="globalConfirmModalBody"></div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="globalConfirmModalCancel">${cancelText}</button>
+                                        <button type="button" class="btn btn-${confirmVariant}" id="globalConfirmModalConfirm">${confirmText}</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        document.body.appendChild(modalEl);
+                    }
+
+                    const titleEl = modalEl.querySelector('#globalConfirmModalTitle');
+                    const bodyEl = modalEl.querySelector('#globalConfirmModalBody');
+                    const cancelBtn = modalEl.querySelector('#globalConfirmModalCancel');
+                    const confirmBtn = modalEl.querySelector('#globalConfirmModalConfirm');
+
+                    if (titleEl) titleEl.textContent = title;
+                    if (cancelBtn) cancelBtn.textContent = cancelText;
+                    if (confirmBtn) {
+                        confirmBtn.textContent = confirmText;
+                        confirmBtn.className = `btn btn-${confirmVariant}`;
+                    }
+                    if (bodyEl) {
+                        bodyEl.innerHTML = app.utils.buildAlertHtml('warning', msg);
+                    }
+
+                    const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    let resolved = false;
+
+                    const cleanup = () => {
+                        if (confirmBtn) confirmBtn.onclick = null;
+                        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    };
+
+                    const onHidden = () => {
+                        if (!resolved) {
+                            resolved = true;
+                            cleanup();
+                            resolve(false);
+                        }
+                    };
+
+                    modalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
+
+                    if (confirmBtn) {
+                        confirmBtn.onclick = () => {
+                            if (resolved) return;
+                            resolved = true;
+                            cleanup();
+                            resolve(true);
+                            instance.hide();
+                        };
+                    }
+
+                    instance.show();
+                } catch (e) {
+                    resolve(confirm(msg));
+                }
+            });
+        },
+
+        confirmAction: function(message, callback, options = {}) {
+            return app.utils.confirm(message, options).then((ok) => {
+                if (ok && typeof callback === 'function') callback();
+                return ok;
+            });
+        },
+
+        confirmFormSubmit: function(form, message, options = {}) {
+            if (!form) return;
+            const msg = (message == null) ? '' : String(message);
+            return app.utils.confirm(msg, options).then((ok) => {
+                if (!ok) return false;
+                try {
+                    form._skipConfirm = true;
+                    form.requestSubmit ? form.requestSubmit() : form.submit();
+                } catch (e) {
+                    try { form.submit(); } catch (e2) {}
+                }
+                return true;
+            });
         },
 
         // Fazer requisição AJAX
@@ -379,6 +505,28 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('submit', function(e) {
         const form = e.target;
         if (!form) return;
+
+        try {
+            if (form._skipConfirm) {
+                form._skipConfirm = false;
+            } else {
+                const confirmMessage = form.getAttribute && form.getAttribute('data-confirm-message');
+                if (confirmMessage) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    app.utils.confirmFormSubmit(form, confirmMessage, {
+                        title: form.getAttribute('data-confirm-title') || 'Confirmação',
+                        confirmText: form.getAttribute('data-confirm-confirm-text') || 'Confirmar',
+                        cancelText: form.getAttribute('data-confirm-cancel-text') || 'Cancelar',
+                        confirmVariant: form.getAttribute('data-confirm-variant') || 'danger'
+                    });
+                    return;
+                }
+            }
+        } catch (err) {
+            // ignore
+        }
+
         app.loading.show();
     }, true);
     

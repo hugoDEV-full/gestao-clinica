@@ -8,28 +8,48 @@
 <!-- Abas de Configurações -->
 <ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="geral-tab" data-bs-toggle="tab" data-bs-target="#geral" type="button" role="tab" aria-controls="geral" aria-selected="true">
+        <button class="nav-link active" id="geral-tab" data-bs-toggle="tab" data-bs-target="#geral" type="button" role="tab" aria-controls="geral" aria-selected="true" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
             <i class="bi bi-house"></i> Geral
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="whatsapp-tab" data-bs-toggle="tab" data-bs-target="#whatsapp" type="button" role="tab" aria-controls="whatsapp" aria-selected="false">
+        <button class="nav-link" id="smtp-tab" data-bs-toggle="tab" data-bs-target="#smtp" type="button" role="tab" aria-controls="smtp" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
+            <i class="bi bi-envelope"></i> E-mail (SMTP)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="whatsapp-tab" data-bs-toggle="tab" data-bs-target="#whatsapp" type="button" role="tab" aria-controls="whatsapp" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
             <i class="bi bi-whatsapp"></i> WhatsApp
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="lembretes-tab" data-bs-toggle="tab" data-bs-target="#lembretes" type="button" role="tab" aria-controls="lembretes" aria-selected="false">
+        <button class="nav-link" id="lembretes-tab" data-bs-toggle="tab" data-bs-target="#lembretes" type="button" role="tab" aria-controls="lembretes" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
             <i class="bi bi-bell"></i> Lembretes
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda" type="button" role="tab" aria-controls="agenda" aria-selected="false">
+        <button class="nav-link" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda" type="button" role="tab" aria-controls="agenda" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
             <i class="bi bi-calendar3"></i> Agenda
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button" role="tab" aria-controls="backup" aria-selected="false">
+        <button class="nav-link" id="acesso-tab" data-bs-toggle="tab" data-bs-target="#acesso" type="button" role="tab" aria-controls="acesso" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
+            <i class="bi bi-shield-check"></i> Acesso/QR
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button" role="tab" aria-controls="backup" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
             <i class="bi bi-cloud-download"></i> Backup
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="permissoes-tab" data-bs-toggle="tab" data-bs-target="#permissoes" type="button" role="tab" aria-controls="permissoes" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
+            <i class="bi bi-shield-lock"></i> Permissões
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab" aria-controls="logs" aria-selected="false" onclick="return window.__cfgTabClick ? window.__cfgTabClick(event, this) : true;">
+            <i class="bi bi-terminal"></i> Logs
         </button>
     </li>
 </ul>
@@ -141,6 +161,85 @@
         </div>
     </div>
 
+    <!-- Aba Permissões -->
+    <div class="tab-pane fade" id="permissoes" role="tabpanel" aria-labelledby="permissoes-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-shield-lock"></i> Permissões por Perfil
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <h6 class="mb-2">Financeiro</h6>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cfg_perm_financeiro_medico_ver">
+                            <label class="form-check-label" for="cfg_perm_financeiro_medico_ver">
+                                Permitir que o perfil <strong>Médico</strong> acesse a página do Financeiro
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cfg_perm_financeiro_medico_lancar">
+                            <label class="form-check-label" for="cfg_perm_financeiro_medico_lancar">
+                                Permitir que o perfil <strong>Médico</strong> lance movimentações no Financeiro
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">Observação: Administrador sempre tem acesso total. Secretária pode lançar, mas não visualiza lista/resumo.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba SMTP -->
+    <div class="tab-pane fade" id="smtp" role="tabpanel" aria-labelledby="smtp-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-envelope"></i> Configurações de E-mail (SMTP)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">URL Externa (APP_BASE_URL)</label>
+                        <input type="text" class="form-control" id="cfg_appBaseUrl" placeholder="https://seu-ngrok.ngrok-free.dev">
+                        <small class="form-text text-muted">Usada para gerar links nos e-mails (ex.: recuperação de senha).</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Servidor (Host)</label>
+                        <input type="text" class="form-control" id="cfg_smtpHost" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Porta</label>
+                        <input type="number" class="form-control" id="cfg_smtpPort" placeholder="587" min="1" max="65535">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Secure (SSL)</label>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="cfg_smtpSecure">
+                            <label class="form-check-label" for="cfg_smtpSecure">Usar SSL</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Usuário</label>
+                        <input type="text" class="form-control" id="cfg_smtpUser" placeholder="seuemail@dominio.com">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Senha</label>
+                        <input type="password" class="form-control" id="cfg_smtpPass" placeholder="senha / app password">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Remetente (From)</label>
+                        <input type="text" class="form-control" id="cfg_smtpFrom" placeholder="Clinica <no-reply@dominio.com>">
+                        <small class="form-text text-muted">Dica: no Gmail, use Senha de App (App Password).</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Aba WhatsApp -->
     <div class="tab-pane fade" id="whatsapp" role="tabpanel" aria-labelledby="whatsapp-tab">
         <div class="card">
@@ -196,6 +295,106 @@
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba Acesso/QR -->
+    <div class="tab-pane fade" id="acesso" role="tabpanel" aria-labelledby="acesso-tab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-shield-check"></i> Controle de Acesso e Ponto (QR)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Modo do QR</label>
+                        <select class="form-select" id="cfg_access_qr_mode" title="Define se o QR é permanente (crachá) ou dinâmico com expiração" data-bs-toggle="tooltip">
+                            <option value="fixed">QR fixo (crachá)</option>
+                            <option value="dynamic">QR dinâmico (expira)</option>
+                        </select>
+                        <small class="form-text text-muted">No modo fixo, o crachá é permanente. No dinâmico, o QR expira.</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Chave HMAC (ACCESS_HMAC_SECRET)</label>
+                        <input type="text" class="form-control" id="cfg_access_hmac_secret" placeholder="defina uma chave forte" title="Usada para assinar o token do QR com segurança" data-bs-toggle="tooltip">
+                        <small class="form-text text-muted">Obrigatória para assinatura do token QR. Guarde com segurança.</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">TTL QR (segundos)</label>
+                        <input type="number" class="form-control" id="cfg_access_qr_ttl_sec" min="10" max="300" placeholder="30" title="Tempo de vida do QR dinâmico" data-bs-toggle="tooltip">
+                        <small class="form-text text-muted">Tempo de vida do QR.</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Whitelist por device</label>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="cfg_access_device_whitelist_enabled" title="Se ativo, apenas devices cadastrados podem registrar ponto" data-bs-toggle="tooltip">
+                            <label class="form-check-label" for="cfg_access_device_whitelist_enabled">Exigir device cadastrado</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cfg_access_device_whitelist_auto_add" title="Se ativo, o primeiro uso cadastra o device automaticamente" data-bs-toggle="tooltip">
+                            <label class="form-check-label" for="cfg_access_device_whitelist_auto_add">Auto-cadastrar device</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Device ID (validade em dias)</label>
+                        <input type="number" class="form-control" id="cfg_access_device_ttl_days" min="30" max="365" placeholder="180" title="Rotação do deviceId no navegador (30 a 365 dias)" data-bs-toggle="tooltip">
+                        <small class="form-text text-muted">Rotação automática do identificador do dispositivo.</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Janela anti-duplicidade (minutos)</label>
+                        <input type="number" class="form-control" id="cfg_access_ponto_dup_minutes" min="1" max="15" placeholder="3" title="Bloqueia ponto repetido do mesmo tipo dentro da janela" data-bs-toggle="tooltip">
+                        <small class="form-text text-muted">Bloqueia ponto repetido do mesmo tipo.</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Rate limit IP+Device (por minuto)</label>
+                        <input type="number" class="form-control" id="cfg_access_rate_ip_limit" min="2" max="60" placeholder="10" title="Limite de tentativas por IP+Device na janela" data-bs-toggle="tooltip">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Janela IP+Device (segundos)</label>
+                        <input type="number" class="form-control" id="cfg_access_rate_ip_window_sec" min="30" max="600" placeholder="60" title="Janela para o rate limit de IP+Device" data-bs-toggle="tooltip">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Rate limit por colaborador (por minuto)</label>
+                        <input type="number" class="form-control" id="cfg_access_rate_colab_limit" min="2" max="60" placeholder="6" title="Limite de tentativas por colaborador na janela" data-bs-toggle="tooltip">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Janela colaborador (segundos)</label>
+                        <input type="number" class="form-control" id="cfg_access_rate_colab_window_sec" min="30" max="600" placeholder="60" title="Janela para o rate limit por colaborador" data-bs-toggle="tooltip">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Exigir geolocalização</label>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="cfg_access_require_geo" title="Se ativo, valida distância do local informado" data-bs-toggle="tooltip">
+                            <label class="form-check-label" for="cfg_access_require_geo">Validar distância do local</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Latitude base</label>
+                        <input type="number" class="form-control" id="cfg_access_geo_lat" placeholder="-15.79" step="0.000001" title="Latitude do local permitido" data-bs-toggle="tooltip">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Longitude base</label>
+                        <input type="number" class="form-control" id="cfg_access_geo_lng" placeholder="-47.88" step="0.000001" title="Longitude do local permitido" data-bs-toggle="tooltip">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Raio permitido (metros)</label>
+                        <input type="number" class="form-control" id="cfg_access_geo_radius" placeholder="200" min="10" max="5000" title="Distância máxima (em metros) do local permitido" data-bs-toggle="tooltip">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Exigir SSID</label>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="cfg_access_require_ssid" title="Se ativo, valida o nome da rede Wi-Fi" data-bs-toggle="tooltip">
+                            <label class="form-check-label" for="cfg_access_require_ssid">Validar Wi-Fi</label>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">SSID permitido</label>
+                        <input type="text" class="form-control" id="cfg_access_allowed_ssid" placeholder="Nome da rede Wi-Fi" title="Nome exato da rede autorizada" data-bs-toggle="tooltip">
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -394,7 +593,7 @@
                     </div>
                     <div class="col-12">
                         <h6>Restauração</h6>
-                        <form class="input-group" action="/configuracoes/backup/restore" method="POST" enctype="multipart/form-data" onsubmit="return confirm('ATENÇÃO: a restauração pode sobrescrever dados. Tem certeza que deseja continuar?')">
+                        <form class="input-group" action="/configuracoes/backup/restore" method="POST" enctype="multipart/form-data" data-confirm-message="ATENÇÃO: a restauração pode sobrescrever dados. Tem certeza que deseja continuar?" data-confirm-title="Confirmação" data-confirm-confirm-text="Restaurar" data-confirm-cancel-text="Cancelar" data-confirm-variant="danger">
                             <input type="file" class="form-control" name="backupFile" accept=".sql,.zip" required>
                             <button type="submit" class="btn btn-outline-secondary">
                                 <i class="bi bi-upload"></i> Restaurar Backup
@@ -402,6 +601,30 @@
                         </form>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba Logs -->
+    <div class="tab-pane fade" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-terminal"></i> Logs do Sistema
+                </h5>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="limparLogsTela()">
+                    <i class="bi bi-trash"></i> Limpar
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted">Exibe as últimas mensagens do console do servidor.</small>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="cfg_logsAuto" checked>
+                        <label class="form-check-label" for="cfg_logsAuto">Atualizar automaticamente</label>
+                    </div>
+                </div>
+                <pre id="cfg_logsBox" class="p-3 bg-dark text-light rounded" style="height: 320px; overflow: auto; white-space: pre-wrap;"></pre>
             </div>
         </div>
     </div>
@@ -442,6 +665,14 @@ async function carregarConfiguracoes() {
         setChk('cfg_exibirLogo', cfg.EXIBIR_LOGO_RELATORIOS, true);
         setChk('cfg_modoManutencao', cfg.MODO_MANUTENCAO, false);
 
+        setVal('cfg_smtpHost', cfg.SMTP_HOST);
+        setVal('cfg_smtpPort', cfg.SMTP_PORT || '587');
+        setChk('cfg_smtpSecure', cfg.SMTP_SECURE, false);
+        setVal('cfg_smtpUser', cfg.SMTP_USER);
+        setVal('cfg_smtpPass', cfg.SMTP_PASS);
+        setVal('cfg_smtpFrom', cfg.SMTP_FROM);
+        setVal('cfg_appBaseUrl', cfg.APP_BASE_URL);
+
         setVal('cfg_whatsappNumber', cfg.WHATSAPP_NUMBER);
         setChk('cfg_whatsappAutoConfirmar', cfg.WHATSAPP_AUTO_CONFIRMAR, true);
         setChk('cfg_whatsappEnviarLembretes', cfg.WHATSAPP_ENVIAR_LEMBRETES, true);
@@ -472,9 +703,30 @@ async function carregarConfiguracoes() {
         setChk('cfg_agendaDias_sab', cfg.AGENDA_DIAS_SAB, false);
         setChk('cfg_agendaDias_dom', cfg.AGENDA_DIAS_DOM, false);
 
+        setVal('cfg_access_hmac_secret', cfg.ACCESS_HMAC_SECRET || '');
+        setVal('cfg_access_qr_mode', (cfg.ACCESS_QR_MODE || 'fixed').toString().toLowerCase());
+        setVal('cfg_access_qr_ttl_sec', cfg.ACCESS_QR_TOKEN_TTL_SEC || '30');
+        setChk('cfg_access_device_whitelist_enabled', cfg.ACCESS_DEVICE_WHITELIST_ENABLED, false);
+        setChk('cfg_access_device_whitelist_auto_add', cfg.ACCESS_DEVICE_WHITELIST_AUTO_ADD, false);
+        setVal('cfg_access_device_ttl_days', cfg.ACCESS_DEVICE_ID_TTL_DAYS || '180');
+        setVal('cfg_access_ponto_dup_minutes', cfg.ACCESS_PONTO_DUP_MINUTES || '3');
+        setVal('cfg_access_rate_ip_limit', cfg.ACCESS_PONTO_RATE_IP_LIMIT || '10');
+        setVal('cfg_access_rate_ip_window_sec', cfg.ACCESS_PONTO_RATE_IP_WINDOW_SEC || '60');
+        setVal('cfg_access_rate_colab_limit', cfg.ACCESS_PONTO_RATE_COLAB_LIMIT || '6');
+        setVal('cfg_access_rate_colab_window_sec', cfg.ACCESS_PONTO_RATE_COLAB_WINDOW_SEC || '60');
+        setChk('cfg_access_require_geo', cfg.ACCESS_REQUIRE_GEO, false);
+        setVal('cfg_access_geo_lat', cfg.ACCESS_GEO_LAT || '');
+        setVal('cfg_access_geo_lng', cfg.ACCESS_GEO_LNG || '');
+        setVal('cfg_access_geo_radius', cfg.ACCESS_GEO_RADIUS_METERS || '200');
+        setChk('cfg_access_require_ssid', cfg.ACCESS_REQUIRE_SSID, false);
+        setVal('cfg_access_allowed_ssid', cfg.ACCESS_ALLOWED_SSID || '');
+
         setChk('cfg_backupAuto', cfg.BACKUP_AUTO, true);
         setVal('cfg_backupFrequencia', cfg.BACKUP_FREQUENCIA || 'daily');
         setVal('cfg_backupHorario', cfg.BACKUP_HORARIO || '02:00');
+
+        setChk('cfg_perm_financeiro_medico_ver', cfg.PERM_FINANCEIRO_MEDICO_VER, false);
+        setChk('cfg_perm_financeiro_medico_lancar', cfg.PERM_FINANCEIRO_MEDICO_LANCAR, false);
 
         const elUltimo = document.getElementById('cfg_backupUltimo');
         const elTamanho = document.getElementById('cfg_backupTamanho');
@@ -487,6 +739,11 @@ async function carregarConfiguracoes() {
 
 async function salvarConfiguracoes() {
     try {
+        const clamp = (value, min, max, fallback) => {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return fallback;
+            return Math.min(max, Math.max(min, n));
+        };
         const cfg = {
             CLINICA_NOME: document.getElementById('cfg_nome')?.value || '',
             CLINICA_CNPJ: document.getElementById('cfg_cnpj')?.value || '',
@@ -498,6 +755,14 @@ async function salvarConfiguracoes() {
             CLINICA_CEP: document.getElementById('cfg_cep')?.value || '',
             EXIBIR_LOGO_RELATORIOS: document.getElementById('cfg_exibirLogo')?.checked ? '1' : '0',
             MODO_MANUTENCAO: document.getElementById('cfg_modoManutencao')?.checked ? '1' : '0',
+
+            SMTP_HOST: document.getElementById('cfg_smtpHost')?.value || '',
+            SMTP_PORT: document.getElementById('cfg_smtpPort')?.value || '',
+            SMTP_SECURE: document.getElementById('cfg_smtpSecure')?.checked ? '1' : '0',
+            SMTP_USER: document.getElementById('cfg_smtpUser')?.value || '',
+            SMTP_PASS: document.getElementById('cfg_smtpPass')?.value || '',
+            SMTP_FROM: document.getElementById('cfg_smtpFrom')?.value || '',
+            APP_BASE_URL: document.getElementById('cfg_appBaseUrl')?.value || '',
 
             WHATSAPP_NUMBER: document.getElementById('cfg_whatsappNumber')?.value || '',
             WHATSAPP_AUTO_CONFIRMAR: document.getElementById('cfg_whatsappAutoConfirmar')?.checked ? '1' : '0',
@@ -531,7 +796,28 @@ async function salvarConfiguracoes() {
 
             BACKUP_AUTO: document.getElementById('cfg_backupAuto')?.checked ? '1' : '0',
             BACKUP_FREQUENCIA: document.getElementById('cfg_backupFrequencia')?.value || 'daily',
-            BACKUP_HORARIO: document.getElementById('cfg_backupHorario')?.value || '02:00'
+            BACKUP_HORARIO: document.getElementById('cfg_backupHorario')?.value || '02:00',
+
+            ACCESS_QR_MODE: document.getElementById('cfg_access_qr_mode')?.value || 'fixed',
+            ACCESS_HMAC_SECRET: document.getElementById('cfg_access_hmac_secret')?.value || '',
+            ACCESS_QR_TOKEN_TTL_SEC: document.getElementById('cfg_access_qr_ttl_sec')?.value || '30',
+            ACCESS_DEVICE_WHITELIST_ENABLED: document.getElementById('cfg_access_device_whitelist_enabled')?.checked ? '1' : '0',
+            ACCESS_DEVICE_WHITELIST_AUTO_ADD: document.getElementById('cfg_access_device_whitelist_auto_add')?.checked ? '1' : '0',
+            ACCESS_DEVICE_ID_TTL_DAYS: String(clamp(document.getElementById('cfg_access_device_ttl_days')?.value, 30, 365, 180)),
+            ACCESS_PONTO_DUP_MINUTES: String(clamp(document.getElementById('cfg_access_ponto_dup_minutes')?.value, 1, 15, 3)),
+            ACCESS_PONTO_RATE_IP_LIMIT: String(clamp(document.getElementById('cfg_access_rate_ip_limit')?.value, 2, 60, 10)),
+            ACCESS_PONTO_RATE_IP_WINDOW_SEC: String(clamp(document.getElementById('cfg_access_rate_ip_window_sec')?.value, 30, 600, 60)),
+            ACCESS_PONTO_RATE_COLAB_LIMIT: String(clamp(document.getElementById('cfg_access_rate_colab_limit')?.value, 2, 60, 6)),
+            ACCESS_PONTO_RATE_COLAB_WINDOW_SEC: String(clamp(document.getElementById('cfg_access_rate_colab_window_sec')?.value, 30, 600, 60)),
+            ACCESS_REQUIRE_GEO: document.getElementById('cfg_access_require_geo')?.checked ? '1' : '0',
+            ACCESS_GEO_LAT: document.getElementById('cfg_access_geo_lat')?.value || '',
+            ACCESS_GEO_LNG: document.getElementById('cfg_access_geo_lng')?.value || '',
+            ACCESS_GEO_RADIUS_METERS: document.getElementById('cfg_access_geo_radius')?.value || '200',
+            ACCESS_REQUIRE_SSID: document.getElementById('cfg_access_require_ssid')?.checked ? '1' : '0',
+            ACCESS_ALLOWED_SSID: document.getElementById('cfg_access_allowed_ssid')?.value || '',
+
+            PERM_FINANCEIRO_MEDICO_VER: document.getElementById('cfg_perm_financeiro_medico_ver')?.checked ? '1' : '0',
+            PERM_FINANCEIRO_MEDICO_LANCAR: document.getElementById('cfg_perm_financeiro_medico_lancar')?.checked ? '1' : '0'
         };
 
         const resp = await fetch('/api/configuracoes', {
@@ -589,6 +875,126 @@ async function configWhatsappTeste() {
         console.error(e);
     }
 }
+
+let logsLastTs = 0;
+let logsTimer = null;
+function limparLogsTela() {
+    const box = document.getElementById('cfg_logsBox');
+    if (box) box.textContent = '';
+    logsLastTs = 0;
+}
+
+async function carregarLogs() {
+    try {
+        const auto = document.getElementById('cfg_logsAuto');
+        if (auto && !auto.checked) return;
+
+        const resp = await fetch(`/api/logs?limit=200&since=${encodeURIComponent(String(logsLastTs || 0))}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        const logs = Array.isArray(data.logs) ? data.logs : [];
+        if (!logs.length) return;
+
+        const box = document.getElementById('cfg_logsBox');
+        if (!box) return;
+
+        const shouldStickBottom = (box.scrollTop + box.clientHeight + 50) >= box.scrollHeight;
+
+        const lines = logs.map(l => {
+            const at = l.at || '';
+            const lvl = (l.level || 'log').toString().toUpperCase();
+            const msg = l.message || '';
+            return `[${at}] ${lvl}: ${msg}`;
+        }).join('\n') + '\n';
+
+        box.textContent += lines;
+        logsLastTs = Number(logs[logs.length - 1].ts || logsLastTs);
+
+        if (shouldStickBottom) {
+            box.scrollTop = box.scrollHeight;
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const tabs = document.getElementById('configTabs');
+        if (tabs) {
+            tabs.addEventListener('click', (e) => {
+                try {
+                    const target = e && e.target ? e.target : null;
+                    const btn = target ? target.closest('[data-bs-toggle="tab"]') : null;
+                    if (!btn) return;
+                    const bsOk = !!(window.bootstrap && window.bootstrap.Tab);
+                    if (bsOk) {
+                        const inst = window.bootstrap.Tab.getOrCreateInstance(btn);
+                        inst.show();
+                        return;
+                    }
+
+                    e.preventDefault();
+
+                    const sel = btn.getAttribute('data-bs-target');
+                    if (!sel) return;
+
+                    tabs.querySelectorAll('.nav-link').forEach((b) => {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-selected', 'false');
+                    });
+                    btn.classList.add('active');
+                    btn.setAttribute('aria-selected', 'true');
+
+                    const content = document.getElementById('configTabContent');
+                    if (content) {
+                        content.querySelectorAll('.tab-pane').forEach((p) => {
+                            p.classList.remove('active');
+                            p.classList.remove('show');
+                        });
+                    }
+                    const pane = document.querySelector(sel);
+                    if (pane) {
+                        pane.classList.add('active');
+                        pane.classList.add('show');
+                    }
+
+                    if (sel === '#logs') {
+                        carregarLogs();
+                        if (logsTimer) clearInterval(logsTimer);
+                        logsTimer = setInterval(carregarLogs, 2000);
+                    } else {
+                        if (logsTimer) {
+                            clearInterval(logsTimer);
+                            logsTimer = null;
+                        }
+                    }
+                } catch (err) {
+                    // ignore
+                }
+            }, true);
+
+            tabs.addEventListener('shown.bs.tab', (event) => {
+                const target = event && event.target ? event.target.getAttribute('data-bs-target') : '';
+                if (target === '#logs') {
+                    carregarLogs();
+                    if (logsTimer) clearInterval(logsTimer);
+                    logsTimer = setInterval(carregarLogs, 2000);
+                } else {
+                    if (logsTimer) {
+                        clearInterval(logsTimer);
+                        logsTimer = null;
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        // ignore
+    }
+});
 
 document.addEventListener('DOMContentLoaded', function() {
     carregarConfiguracoes();

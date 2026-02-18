@@ -1,4 +1,4 @@
-<div class="p-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height:100%;">
+<div class="sidebar p-3" style="min-height:100%;">
   <div class="text-center text-white mb-3">
     <% if (typeof clinicaLogoUrl !== 'undefined' && clinicaLogoUrl) { %>
       <div class="mb-2">
@@ -10,22 +10,45 @@
     <div class="small text-white-50"><%= safeAppConfig.CLINICA_CIDADE ? safeAppConfig.CLINICA_CIDADE : 'Gestão' %></div>
   </div>
   <ul class="nav nav-pills flex-column gap-1">
-    <li class="nav-item"><a class="nav-link text-white <%= currentPage === 'dashboard' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/dashboard" data-bs-toggle="tooltip" data-bs-placement="right" title="Visão geral do sistema: indicadores, alertas e atalhos rápidos."><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'pacientes' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/pacientes" data-bs-toggle="tooltip" data-bs-placement="right" title="Cadastro e consulta de pacientes: dados, status e ações rápidas."><i class="bi bi-people me-2"></i>Pacientes</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'prontuarios' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/prontuarios" data-bs-toggle="tooltip" data-bs-placement="right" title="Prontuários e evoluções: histórico clínico, atendimentos e impressão."><i class="bi bi-file-medical me-2"></i>Prontuários</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'agenda' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/agenda" data-bs-toggle="tooltip" data-bs-placement="right" title="Agenda do dia: lista de consultas com filtros e ações (confirmar, remarcar, cancelar)."><i class="bi bi-calendar3 me-2"></i>Agenda</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'agendamentos' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/agendamentos" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar agendamentos: visualizar e organizar consultas por status e período."><i class="bi bi-calendar-check me-2"></i>Agendamentos</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'lembretes' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/lembretes" data-bs-toggle="tooltip" data-bs-placement="right" title="Lembretes e notificações: envio manual/automático e histórico de tentativas."><i class="bi bi-bell me-2"></i>Lembretes</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'financeiro' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/financeiro" data-bs-toggle="tooltip" data-bs-placement="right" title="Financeiro: controle de receitas/despesas e visão do caixa."><i class="bi bi-currency-dollar me-2"></i>Financeiro</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'profissionais' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/profissionais" data-bs-toggle="tooltip" data-bs-placement="right" title="Profissionais: cadastro da equipe e vinculação com atendimentos."><i class="bi bi-person-workspace me-2"></i>Profissionais</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'convenios' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/convenios" data-bs-toggle="tooltip" data-bs-placement="right" title="Convênios: planos, regras e informações para atendimento/faturamento."><i class="bi bi-card-text me-2"></i>Convênios</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'configuracoes' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/configuracoes" data-bs-toggle="tooltip" data-bs-placement="right" title="Configurações gerais, WhatsApp, lembretes, agenda e backup do sistema."><i class="bi bi-gear me-2"></i>Configurações</a></li>
-    <% if (usuario && usuario.tipo === 'admin') { %>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'usuarios' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/usuarios" data-bs-toggle="tooltip" data-bs-placement="right" title="Usuários (admin): criar, consultar e administrar acessos."><i class="bi bi-people-fill me-2"></i>Usuários</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'auditoria' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/auditoria" data-bs-toggle="tooltip" data-bs-placement="right" title="Auditoria (LGPD): histórico de ações realizadas no sistema."><i class="bi bi-shield-check me-2"></i>Auditoria</a></li>
+    <% if (usuario && usuario.tipo === 'paciente') { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'perfil' ? 'active' : '' %>" href="/perfil" data-bs-toggle="tooltip" data-bs-placement="right" title="Meu Perfil: visualizar meus dados."><i class="bi bi-person-circle me-2"></i>Meu Perfil</a></li>
+    <% } else if (usuario && usuario.tipo === 'secretaria') { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'agenda' ? 'active' : '' %>" href="/agenda" data-bs-toggle="tooltip" data-bs-placement="right" title="Agenda do dia: lista de consultas com filtros e ações (confirmar, remarcar, cancelar)."><i class="bi bi-calendar3 me-2"></i>Agenda</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'agendamentos' ? 'active' : '' %>" href="/agendamentos" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar agendamentos: visualizar e organizar consultas por status e período."><i class="bi bi-calendar-check me-2"></i>Agendamentos</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'lembretes' ? 'active' : '' %>" href="/lembretes" data-bs-toggle="tooltip" data-bs-placement="right" title="Lembretes e notificações: envio manual/automático e histórico de tentativas."><i class="bi bi-bell me-2"></i>Lembretes</a></li>
+    <% } else { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'dashboard' ? 'active' : '' %>" href="/dashboard" data-bs-toggle="tooltip" data-bs-placement="right" title="Visão geral do sistema: indicadores, alertas e atalhos rápidos."><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'pacientes' ? 'active' : '' %>" href="/pacientes" data-bs-toggle="tooltip" data-bs-placement="right" title="Cadastro e consulta de pacientes: dados, status e ações rápidas."><i class="bi bi-people me-2"></i>Pacientes</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'prontuarios' ? 'active' : '' %>" href="/prontuarios" data-bs-toggle="tooltip" data-bs-placement="right" title="Prontuários e evoluções: histórico clínico, atendimentos e impressão."><i class="bi bi-file-medical me-2"></i>Prontuários</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'agenda' ? 'active' : '' %>" href="/agenda" data-bs-toggle="tooltip" data-bs-placement="right" title="Agenda do dia: lista de consultas com filtros e ações (confirmar, remarcar, cancelar)."><i class="bi bi-calendar3 me-2"></i>Agenda</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'agendamentos' ? 'active' : '' %>" href="/agendamentos" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar agendamentos: visualizar e organizar consultas por status e período."><i class="bi bi-calendar-check me-2"></i>Agendamentos</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'lembretes' ? 'active' : '' %>" href="/lembretes" data-bs-toggle="tooltip" data-bs-placement="right" title="Lembretes e notificações: envio manual/automático e histórico de tentativas."><i class="bi bi-bell me-2"></i>Lembretes</a></li>
+      <% const permFinanceiroMedicoVer = safeAppConfig && (String(safeAppConfig.PERM_FINANCEIRO_MEDICO_VER || '').trim() === '1' || String(safeAppConfig.PERM_FINANCEIRO_MEDICO_VER || '').trim().toLowerCase() === 'true'); %>
+      <% if (usuario && (usuario.tipo === 'admin' || (usuario.tipo === 'medico' && permFinanceiroMedicoVer))) { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'financeiro' ? 'active' : '' %>" href="/financeiro" data-bs-toggle="tooltip" data-bs-placement="right" title="Financeiro: controle de receitas/despesas e visão do caixa."><i class="bi bi-currency-dollar me-2"></i>Financeiro</a></li>
+      <% } %>
+      <% if (usuario && usuario.tipo === 'admin') { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'estatisticas' ? 'active' : '' %>" href="/estatisticas" data-bs-toggle="tooltip" data-bs-placement="right" title="Estatísticas gerenciais: indicadores, distribuição por status e rankings."><i class="bi bi-bar-chart me-2"></i>Estatísticas</a></li>
+      <% } %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'profissionais' ? 'active' : '' %>" href="/profissionais" data-bs-toggle="tooltip" data-bs-placement="right" title="Profissionais: cadastro da equipe e vinculação com atendimentos."><i class="bi bi-person-workspace me-2"></i>Profissionais</a></li>
+      <% if (usuario && usuario.tipo === 'admin') { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'configuracoes' ? 'active' : '' %>" href="/configuracoes" data-bs-toggle="tooltip" data-bs-placement="right" title="Configurações gerais, WhatsApp, lembretes, agenda e backup do sistema."><i class="bi bi-gear me-2"></i>Configurações</a></li>
+      <% } %>
+      <% if (usuario && usuario.tipo === 'admin') { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'usuarios' ? 'active' : '' %>" href="/usuarios" data-bs-toggle="tooltip" data-bs-placement="right" title="Usuários (admin): criar, consultar e administrar acessos."><i class="bi bi-people-fill me-2"></i>Usuários</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'colaboradores' ? 'active' : '' %>" href="/colaboradores" data-bs-toggle="tooltip" data-bs-placement="right" title="Colaboradores e controle de acesso: QR Code e status."><i class="bi bi-person-badge me-2"></i>Colaboradores</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'acessos' ? 'active' : '' %>" href="/acessos" data-bs-toggle="tooltip" data-bs-placement="right" title="Acessos via QR: registros e filtros."><i class="bi bi-shield-check me-2"></i>Acessos</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'permissoes' ? 'active' : '' %>" href="/permissoes" data-bs-toggle="tooltip" data-bs-placement="right" title="Permissões (admin): habilitar/desabilitar acessos por papel."><i class="bi bi-shield-lock me-2"></i>Permissões</a></li>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'auditoria' ? 'active' : '' %>" href="/auditoria" data-bs-toggle="tooltip" data-bs-placement="right" title="Auditoria (LGPD): histórico de ações realizadas no sistema."><i class="bi bi-shield-check me-2"></i>Auditoria</a></li>
+      <% } %>
+      <% if (usuario && usuario.tipo === 'admin') { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'whatsapp' ? 'active' : '' %>" href="/whatsapp" data-bs-toggle="tooltip" data-bs-placement="right" title="Integração WhatsApp: status da conexão, QR Code e testes de envio."><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
+      <% } %>
+      <% if (usuario && usuario.tipo === 'admin') { %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'relatorio-hugo' ? 'active' : '' %>" href="/relatorio-hugo" data-bs-toggle="tooltip" data-bs-placement="right" title="Relatório privado: resumo de funcionalidades e checklist de testes."><i class="bi bi-journal-text me-2"></i>Relatório</a></li>
+      <% } %>
+      <li class="nav-item"><a class="nav-link <%= currentPage === 'ajuda' ? 'active' : '' %>" href="/ajuda" data-bs-toggle="tooltip" data-bs-placement="right" title="Central de ajuda: orientações rápidas e dúvidas frequentes."><i class="bi bi-question-circle me-2"></i>Ajuda</a></li>
     <% } %>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'whatsapp' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/whatsapp" data-bs-toggle="tooltip" data-bs-placement="right" title="Integração WhatsApp: status da conexão, QR Code e testes de envio."><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
-    <li class="nav-item"><a class="nav-link <%= currentPage === 'ajuda' ? 'active bg-white text-dark' : 'text-white-50' %>" href="/ajuda" data-bs-toggle="tooltip" data-bs-placement="right" title="Central de ajuda: orientações rápidas e dúvidas frequentes."><i class="bi bi-question-circle me-2"></i>Ajuda</a></li>
   </ul>
 
   <hr class="border-white border-opacity-25" />

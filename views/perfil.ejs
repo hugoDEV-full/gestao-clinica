@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3><i class="bi bi-person-circle"></i> Meu Perfil</h3>
     <div class="btn-group">
-        <button type="button" class="btn btn-outline-secondary">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
             <i class="bi bi-printer"></i> Imprimir
         </button>
     </div>
@@ -212,17 +212,17 @@
                 <button type="button" class="btn btn-primary" onclick="salvarPerfil()">
                     <i class="bi bi-check-circle"></i> Salvar Alterações
                 </button>
-                <button type="button" class="btn btn-outline-secondary">
+                <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
                     <i class="bi bi-arrow-clockwise"></i> Cancelar
                 </button>
             </div>
             <div>
-                <button type="button" class="btn btn-outline-warning">
+                <a class="btn btn-outline-warning" href="/perfil/export">
                     <i class="bi bi-download"></i> Exportar Meus Dados
-                </button>
-                <button type="button" class="btn btn-outline-danger">
+                </a>
+                <a class="btn btn-outline-danger" href="/logout">
                     <i class="bi bi-box-arrow-right"></i> Sair
-                </button>
+                </a>
             </div>
         </div>
     </div>
@@ -231,7 +231,9 @@
 <script>
 function salvarPerfil() {
     // Simulação de salvamento
-    alert('Perfil atualizado com sucesso!');
+    if (window.app && window.app.utils && window.app.utils.showNotification) {
+        window.app.utils.showNotification('Perfil atualizado com sucesso!', 'success');
+    }
 }
 
 function alterarSenha() {

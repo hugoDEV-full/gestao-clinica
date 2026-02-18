@@ -4,50 +4,55 @@
         <button type="button" class="btn btn-primary" onclick="window.location.href='/agendamentos/novo'" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Cadastrar um novo agendamento (paciente, data/hora, profissional e tipo).">
             <i class="bi bi-plus-circle"></i> Novo Agendamento
         </button>
-        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Exportar a lista atual de agendamentos.">
+        <a href="/agendamentos/export?<%= new URLSearchParams({ status: (filtros && filtros.status) ? filtros.status : '', profissional_id: (filtros && filtros.profissional_id) ? filtros.profissional_id : '', periodo: (filtros && filtros.periodo) ? filtros.periodo : '', format: 'csv' }).toString() %>" class="btn btn-outline-secondary" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Exportar a lista atual de agendamentos.">
             <i class="bi bi-download"></i> Exportar
-        </button>
+        </a>
     </div>
 </div>
 
 <!-- Filtros -->
 <div class="card mb-4">
     <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Status</label>
-                <select class="form-select">
-                    <option value="">Todos</option>
-                    <option value="agendado">Agendado</option>
-                    <option value="confirmado">Confirmado</option>
-                    <option value="realizado">Realizado</option>
-                    <option value="cancelado">Cancelado</option>
-                </select>
+        <form method="GET" action="/agendamentos">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status">
+                        <option value="" <%= !(filtros && filtros.status) ? 'selected' : '' %>>Todos</option>
+                        <option value="agendado" <%= (filtros && filtros.status === 'agendado') ? 'selected' : '' %>>Agendado</option>
+                        <option value="confirmado" <%= (filtros && filtros.status === 'confirmado') ? 'selected' : '' %>>Confirmado</option>
+                        <option value="realizado" <%= (filtros && filtros.status === 'realizado') ? 'selected' : '' %>>Realizado</option>
+                        <option value="cancelado" <%= (filtros && filtros.status === 'cancelado') ? 'selected' : '' %>>Cancelado</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Profissional</label>
+                    <select class="form-select" name="profissional_id">
+                        <option value="" <%= !(filtros && filtros.profissional_id) ? 'selected' : '' %>>Todos</option>
+                        <% if (typeof profissionais !== 'undefined' && profissionais && profissionais.length) { %>
+                            <% profissionais.forEach(pr => { %>
+                                <option value="<%= pr.id %>" <%= (filtros && String(filtros.profissional_id) === String(pr.id)) ? 'selected' : '' %>><%= pr.nome %></option>
+                            <% }) %>
+                        <% } %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Período</label>
+                    <select class="form-select" name="periodo">
+                        <option value="" <%= !(filtros && filtros.periodo) ? 'selected' : '' %>>Todos</option>
+                        <option value="hoje" <%= (filtros && filtros.periodo === 'hoje') ? 'selected' : '' %>>Hoje</option>
+                        <option value="semana" <%= (filtros && filtros.periodo === 'semana') ? 'selected' : '' %>>Esta Semana</option>
+                        <option value="mes" <%= (filtros && filtros.periodo === 'mes') ? 'selected' : '' %>>Este Mês</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                </div>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Profissional</label>
-                <select class="form-select">
-                    <option value="">Todos</option>
-                    <option value="1">Dr. André Ballejo</option>
-                    <option value="2">Dra. Ana Silva</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Período</label>
-                <select class="form-select">
-                    <option value="">Todos</option>
-                    <option value="hoje">Hoje</option>
-                    <option value="semana">Esta Semana</option>
-                    <option value="mes">Este Mês</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">&nbsp;</label>
-                <button type="button" class="btn btn-outline-secondary w-100">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-            </div>
-        </div>
+        </form>
     </div>
 </div>
 
@@ -101,16 +106,16 @@
                         </td>
                         <td>
                             <div class="btn-group">
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar este agendamento (indisponível nesta tela)." disabled>
+                                <a class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar" href="/agendamentos/<%= a.id %>/editar?redirect_to=<%= encodeURIComponent('/agendamentos') %>">
                                     <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Confirmar presença do paciente (indisponível nesta tela)." disabled>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Confirmar" data-action="ag-status" data-id="<%= a.id %>" data-status="confirmado">
                                     <i class="bi bi-check-circle"></i>
                                 </button>
-                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Remarcar data/horário (indisponível nesta tela)." disabled>
+                                <a class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Remarcar" href="/agendamentos/<%= a.id %>/remarcar">
                                     <i class="bi bi-calendar-event"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Cancelar este agendamento (indisponível nesta tela)." disabled>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Cancelar" data-action="ag-cancelar" data-id="<%= a.id %>">
                                     <i class="bi bi-x-circle"></i>
                                 </button>
                             </div>
@@ -130,3 +135,55 @@
         <% } %>
     </div>
 </div>
+
+<script>
+async function agStatus(id, status) {
+    try {
+        const ok = confirm('Confirmar alteração de status para ' + status + '?');
+        if (!ok) return;
+        const resp = await fetch('/agendamentos/' + id + '/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        const data = await resp.json();
+        if (data && data.success) return window.location.reload();
+        alert((data && data.message) ? data.message : 'Erro ao atualizar status');
+    } catch (e) {
+        alert('Erro ao atualizar status');
+    }
+}
+
+async function agCancelar(id) {
+    try {
+        const ok = confirm('Deseja cancelar este agendamento?');
+        if (!ok) return;
+        const resp = await fetch('/agendamentos/' + id + '/cancelar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ motivo: 'Cancelado pelo usuário' })
+        });
+        const data = await resp.json();
+        if (data && data.success) return window.location.reload();
+        alert((data && data.message) ? data.message : 'Erro ao cancelar');
+    } catch (e) {
+        alert('Erro ao cancelar');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-action="ag-status"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            const status = btn.getAttribute('data-status') || 'confirmado';
+            agStatus(id, status);
+        });
+    });
+    document.querySelectorAll('[data-action="ag-cancelar"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            agCancelar(id);
+        });
+    });
+});
+</script>

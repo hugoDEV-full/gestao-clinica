@@ -1,0 +1,97 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-shield-lock"></i> Permissões</h3>
+    <button type="button" class="btn btn-primary" onclick="salvarPermissoes()">
+        <i class="bi bi-check-circle"></i> Salvar Alterações
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Permissões por papel de usuário</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <h6 class="mb-2">Financeiro</h6>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="perm_financeiro_medico_ver">
+                    <label class="form-check-label" for="perm_financeiro_medico_ver">
+                        Médico pode acessar a página do Financeiro
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="perm_financeiro_medico_lancar">
+                    <label class="form-check-label" for="perm_financeiro_medico_lancar">
+                        Médico pode lançar movimentações no Financeiro
+                    </label>
+                </div>
+                <small class="form-text text-muted">Administrador sempre tem acesso total. Secretária pode lançar, mas não visualiza lista/resumo.</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function carregarPermissoes() {
+    try {
+        const resp = await fetch('/api/configuracoes', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const data = await resp.json();
+        if (!data || !data.success) return;
+
+        const cfg = data.config || {};
+        const setChk = (id, v, defaultVal = false) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (v == null) {
+                el.checked = !!defaultVal;
+            } else {
+                el.checked = String(v) === '1' || String(v).toLowerCase() === 'true';
+            }
+        };
+
+        setChk('perm_financeiro_medico_ver', cfg.PERM_FINANCEIRO_MEDICO_VER, false);
+        setChk('perm_financeiro_medico_lancar', cfg.PERM_FINANCEIRO_MEDICO_LANCAR, false);
+    } catch (e) {
+        console.error('Erro ao carregar permissões:', e);
+    }
+}
+
+async function salvarPermissoes() {
+    try {
+        const cfg = {
+            PERM_FINANCEIRO_MEDICO_VER: document.getElementById('perm_financeiro_medico_ver')?.checked ? '1' : '0',
+            PERM_FINANCEIRO_MEDICO_LANCAR: document.getElementById('perm_financeiro_medico_lancar')?.checked ? '1' : '0'
+        };
+
+        const resp = await fetch('/api/configuracoes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ config: cfg })
+        });
+
+        const data = await resp.json();
+        if (data && data.success) {
+            if (window.app && window.app.utils && window.app.utils.showNotification) {
+                window.app.utils.showNotification('Permissões salvas com sucesso!', 'success');
+            }
+        } else {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : 'Erro ao salvar permissões';
+            if (window.app && window.app.utils && window.app.utils.showNotification) {
+                window.app.utils.showNotification(msg, 'danger');
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao salvar permissões:', e);
+        if (window.app && window.app.utils && window.app.utils.showNotification) {
+            window.app.utils.showNotification('Erro ao salvar permissões', 'danger');
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    carregarPermissoes();
+});
+</script>

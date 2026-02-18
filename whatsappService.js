@@ -14,6 +14,11 @@ class WhatsAppService {
         this.initializeClient();
     }
 
+    isConnectedState(state) {
+        const s = (state == null) ? '' : String(state).toLowerCase();
+        return s === 'connected' || s === 'open' || s === 'ready';
+    }
+
     resolveBrowserExecutablePath() {
         const envPath = process.env.WHATSAPP_CHROME_PATH;
         if (envPath && fs.existsSync(envPath)) return envPath;
@@ -86,6 +91,17 @@ class WhatsAppService {
             this.qrCode = null;
         });
 
+        // Mudança de estado
+        this.client.on('change_state', (state) => {
+            try {
+                console.log('WhatsApp Client mudou de estado:', state);
+                this.isConnected = this.isConnectedState(state);
+                if (this.isConnected) this.qrCode = null;
+            } catch (e) {
+                // ignore
+            }
+        });
+
         // Desconectado
         this.client.on('disconnected', (reason) => {
             console.log('WhatsApp Client desconectado:', reason);
@@ -145,6 +161,24 @@ class WhatsAppService {
 
     // Obter status
     getStatus() {
+        // Inferir conexão de forma mais robusta do que apenas o flag interno,
+        // porque em alguns cenários o wwebjs pode trocar estados sem disparar `ready` novamente.
+        try {
+            if (this.client) {
+                const st = this.client.state;
+                const inferredConnected = this.isConnectedState(st) || !!(this.client.info && this.client.info.wid);
+                if (inferredConnected && !this.isConnected) {
+                    this.isConnected = true;
+                    this.qrCode = null;
+                }
+                if (!inferredConnected && this.isConnected) {
+                    // Mantém coerência quando o cliente cai mas não disparou evento ainda
+                    this.isConnected = false;
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
         return {
             isConnected: this.isConnected,
             isStarting: this.isStarting,

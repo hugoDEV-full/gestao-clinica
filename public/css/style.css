@@ -21,6 +21,11 @@ body {
 html,
 body {
     max-width: 100%;
+    overflow-x: hidden;
+}
+
+.d-none {
+    display: none !important;
 }
 
 img,
@@ -30,10 +35,7 @@ canvas {
     height: auto;
 }
 
-.container,
-.container-fluid {
-    max-width: 100%;
-}
+
 
 .table-responsive {
     overflow-x: auto;
@@ -48,6 +50,46 @@ code {
     word-break: break-word;
 }
 
+/* Centralizar titulo das paginas mantendo acoes a direita */
+.content-with-hamburger > .d-flex.justify-content-between.align-items-center.mb-4 {
+    position: relative;
+}
+
+.content-with-hamburger > .d-flex.justify-content-between.align-items-center.mb-4 > h3 {
+    flex: 1;
+    text-align: center;
+    margin-bottom: 0;
+}
+
+.content-with-hamburger > .d-flex.justify-content-between.align-items-center.mb-4 > :not(h3) {
+    position: absolute;
+    right: 0;
+}
+
+@media (max-width: 576px) {
+    .content-with-hamburger > .d-flex.justify-content-between.align-items-center.mb-4 {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 12px;
+    }
+
+    .content-with-hamburger > .d-flex.justify-content-between.align-items-center.mb-4 > h3 {
+        text-align: left;
+        width: 100%;
+    }
+
+    .content-with-hamburger > .d-flex.justify-content-between.align-items-center.mb-4 > :not(h3) {
+        position: static;
+        width: 100%;
+    }
+
+    .content-with-hamburger > .d-flex.justify-content-between.align-items-center.mb-4 .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}
+
 .global-loading {
     position: fixed;
     inset: 0;
@@ -55,6 +97,11 @@ code {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+#globalLoading.d-none {
+    display: none !important;
+    pointer-events: none;
 }
 
 .global-loading__backdrop {
@@ -89,11 +136,17 @@ code {
     font-weight: 500;
 }
 
+.sidebar .nav-link:focus,
+.sidebar .nav-link:active,
+.sidebar .nav-link:visited {
+    color: rgba(255,255,255,.8);
+}
+
 .sidebar .nav-link:hover,
 .sidebar .nav-link.active {
     color: white;
     background: rgba(255,255,255,.2);
-    transform: translateX(5px);
+    transform: translateX(2px);
 }
 
 .sidebar .nav-link i {
@@ -105,7 +158,25 @@ code {
 .main-content {
     background: #f8f9fa;
     min-height: 100vh;
+}
+
+@media (max-width: 767.98px) {
+    .content-with-hamburger {
+        padding-left: 72px;
+    }
+
+    .content-with-hamburger > .d-flex.justify-content-between.align-items-center {
+        padding-left: 16px;
+    }
+}
+
+.main-content {
     padding-top: 20px;
+}
+
+.main-content,
+main {
+    min-width: 0;
 }
 
 /* Cards */
@@ -429,8 +500,15 @@ code {
         margin-left: 0;
     }
 
-    .container-fluid.py-4 {
-        padding-top: 72px !important;
+    .sidebar .nav-link {
+        margin: 0;
+        border-radius: 0;
+        transform: none;
+    }
+
+    .sidebar .nav-link:hover,
+    .sidebar .nav-link.active {
+        transform: none;
     }
     
     .stats-card {

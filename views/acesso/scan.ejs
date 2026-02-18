@@ -1,0 +1,43 @@
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header text-center">
+                    <h4 class="mb-0"><i class="bi bi-qr-code"></i> Validação de Acesso</h4>
+                </div>
+                <div class="card-body text-center">
+                    <% const st = (status || '').toString(); %>
+                    <% if (st === 'autorizado') { %>
+                        <div class="display-4 text-success mb-3">✅</div>
+                        <h5 class="text-success mb-2">Acesso autorizado</h5>
+                    <% } else if (st === 'restrito') { %>
+                        <div class="display-4 text-warning mb-3">⚠️</div>
+                        <h5 class="text-warning mb-2">Acesso restrito</h5>
+                    <% } else { %>
+                        <div class="display-4 text-danger mb-3">❌</div>
+                        <h5 class="text-danger mb-2">Acesso não autorizado</h5>
+                    <% } %>
+                    <div class="text-muted mb-3"><%= motivo || '-' %></div>
+
+                    <% if (colaborador) { %>
+                        <div class="d-flex flex-column align-items-center">
+                            <% if (colaborador.foto_url) { %>
+                                <img src="<%= colaborador.foto_url %>" class="rounded-circle mb-2" style="width:90px; height:90px; object-fit:cover;" alt="Foto">
+                            <% } else { %>
+                                <div class="avatar-sm bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width:90px; height:90px; font-size:32px;">
+                                    <%= (colaborador.nome || 'C').toString().trim().slice(0,1).toUpperCase() %>
+                                </div>
+                            <% } %>
+                            <div class="fw-bold"><%= colaborador.nome %></div>
+                            <div class="small text-muted">CPF: <%= colaborador.cpf || '-' %></div>
+                            <div class="small text-muted"><%= colaborador.empresa || '-' %> • <%= colaborador.cargo || '-' %></div>
+                        </div>
+                    <% } %>
+                </div>
+                <div class="card-footer text-center text-muted small">
+                    Atualizado em <%= moment().format('DD/MM/YYYY HH:mm:ss') %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

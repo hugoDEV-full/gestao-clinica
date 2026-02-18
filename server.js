@@ -1,7 +1,10 @@
 require('dotenv').config();
+process.env.TZ = process.env.TZ || 'America/Sao_Paulo';
 const express = require('express');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
@@ -11,6 +14,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 const expressLayouts = require('express-ejs-layouts');
+moment.locale('pt-br');
 
 const archiver = require('archiver');
 const unzipper = require('unzipper');
@@ -20,38 +24,226 @@ const os = require('os');
 // Importar serviços
 const { initDB, getDB } = require('./database');
 
+function nowLabel() {
+    return moment().format('YYYY-MM-DD HH:mm:ss');
+}
+
+async function ensureColaboradorStaticTokenColumn(db) {
+    try {
+        const [cols] = await db.execute(
+            `SELECT COLUMN_NAME
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'colaboradores'
+               AND COLUMN_NAME = 'qr_static_token'
+             LIMIT 1`
+        );
+        if (!cols || !cols.length) {
+            await db.execute('ALTER TABLE colaboradores ADD COLUMN qr_static_token VARCHAR(64) NULL');
+            await db.execute('ALTER TABLE colaboradores ADD UNIQUE KEY uniq_colaborador_qr_static (qr_static_token)');
+        }
+    } catch (e) {
+        console.error('Erro ao garantir coluna qr_static_token:', e);
+    }
+}
+
+function nowIsoLocal() {
+    return moment().format('YYYY-MM-DDTHH:mm:ss.SSSZ');
+}
+
+const systemLogBuffer = [];
+const SYSTEM_LOG_MAX = Number(process.env.SYSTEM_LOG_MAX || 500);
+function pushSystemLog(level, parts) {
+    try {
+        const msg = parts.map(p => {
+            if (p == null) return '';
+            if (typeof p === 'string') return p;
+            if (p instanceof Error) return (p.stack || p.message || String(p));
+            try { return JSON.stringify(p); } catch { return String(p); }
+        }).join(' ');
+        systemLogBuffer.push({
+            ts: Date.now(),
+            at: nowLabel(),
+            level: String(level || 'log'),
+            message: msg
+        });
+        while (systemLogBuffer.length > SYSTEM_LOG_MAX) systemLogBuffer.shift();
+    } catch {
+        // ignore
+    }
+}
+
+const _consoleLog = console.log.bind(console);
+const _consoleInfo = console.info.bind(console);
+const _consoleWarn = console.warn.bind(console);
+const _consoleError = console.error.bind(console);
+
+console.log = (...args) => {
+    pushSystemLog('log', args);
+    _consoleLog(...args);
+};
+console.info = (...args) => {
+    pushSystemLog('info', args);
+    _consoleInfo(...args);
+};
+console.warn = (...args) => {
+    pushSystemLog('warn', args);
+    _consoleWarn(...args);
+};
+console.error = (...args) => {
+    pushSystemLog('error', args);
+    _consoleError(...args);
+};
+
+const pontoRateLimit = new Map();
+function checkPontoRateLimit(key, limit = 10, windowMs = 60 * 1000) {
+    const now = Date.now();
+    const current = pontoRateLimit.get(key);
+    if (!current || (now - current.resetAt) > windowMs) {
+        pontoRateLimit.set(key, { count: 1, resetAt: now });
+        return true;
+    }
+    if (current.count >= limit) return false;
+    current.count += 1;
+    return true;
+}
+
+function sha256Hex(value) {
+    return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function generateResetCode() {
+    return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function getAppBaseUrl(req) {
+    const envBase = (process.env.APP_BASE_URL || '').toString().trim();
+    if (envBase) return envBase.replace(/\/$/, '');
+    const proto = (req && (req.headers['x-forwarded-proto'] || req.protocol)) ? String(req.headers['x-forwarded-proto'] || req.protocol) : 'http';
+    const host = req && req.get ? req.get('host') : null;
+    if (!host) return '';
+    return `${proto}://${host}`;
+}
+
+async function getAppBaseUrlFromConfig(db, req) {
+    const envBase = (process.env.APP_BASE_URL || '').toString().trim();
+    if (envBase) return envBase.replace(/\/$/, '');
+    const cfgBase = await getAppConfigValue(db, 'APP_BASE_URL');
+    const cfg = (cfgBase == null ? '' : String(cfgBase)).trim();
+    if (cfg) return cfg.replace(/\/$/, '');
+    return getAppBaseUrl(req);
+}
+
+function getMailerTransporter() {
+    const host = (process.env.SMTP_HOST || '').toString().trim();
+    const port = Number(process.env.SMTP_PORT || 587);
+    const user = (process.env.SMTP_USER || '').toString().trim();
+    const pass = (process.env.SMTP_PASS || '').toString();
+    const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || String(process.env.SMTP_SECURE || '') === '1';
+
+    if (!host || !user || !pass) return null;
+
+    return nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: { user, pass }
+    });
+}
+
+async function notifyBlockedAccessAttempt(db, colaborador, motivo, req) {
+    try {
+        const cfgAlert = await getAppConfigValue(db, 'ALERTA_ACESSO_EMAIL');
+        let recipients = [];
+        if (cfgAlert && String(cfgAlert).trim()) {
+            recipients = String(cfgAlert)
+                .split(',')
+                .map((v) => v.trim())
+                .filter(Boolean);
+        } else {
+            const [admins] = await db.execute(
+                "SELECT email FROM usuarios WHERE tipo = 'admin' AND ativo = TRUE AND email IS NOT NULL"
+            );
+            recipients = (admins || []).map((a) => a.email).filter(Boolean);
+        }
+
+        if (!recipients.length) return;
+
+        const transporter = await getMailerTransporterFromConfig(db);
+        if (!transporter) return;
+
+        const baseUrl = await getAppBaseUrlFromConfig(db, req);
+        const fromCfg = await getAppConfigValue(db, 'SMTP_FROM');
+        const from = (fromCfg != null && String(fromCfg).trim())
+            ? String(fromCfg).trim()
+            : (process.env.SMTP_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
+
+        const subject = 'Alerta de acesso bloqueado - Controle de Acesso';
+        const link = baseUrl ? `${baseUrl}/colaboradores/${colaborador.id}` : '';
+        const text = `Tentativa de acesso bloqueado.\n\nNome: ${colaborador.nome}\nCPF: ${colaborador.cpf}\nEmpresa: ${colaborador.empresa || '-'}\nCargo: ${colaborador.cargo || '-'}\nMotivo: ${motivo}\nData/Hora: ${nowLabel()}\nDetalhes: ${link || 'sem link'}`;
+
+        await transporter.sendMail({
+            from,
+            to: recipients.join(','),
+            subject,
+            text
+        });
+    } catch (e) {
+        console.error('Erro ao enviar alerta de acesso bloqueado:', e);
+    }
+}
+
+async function notifyBlockedAccessAttemptWhatsapp(db, colaborador, motivo) {
+    try {
+        const cfgWhats = await getAppConfigValue(db, 'ALERTA_ACESSO_WHATSAPP');
+        const cfgDefault = await getAppConfigValue(db, 'WHATSAPP_NUMBER');
+        const raw = (cfgWhats || cfgDefault || '').toString().trim();
+        if (!raw) return;
+
+        const status = whatsappService.getStatus();
+        if (!status || !status.isConnected) return;
+
+        const text = `⚠️ Alerta de acesso bloqueado\nNome: ${colaborador.nome}\nCPF: ${colaborador.cpf}\nEmpresa: ${colaborador.empresa || '-'}\nCargo: ${colaborador.cargo || '-'}\nMotivo: ${motivo}\nData/Hora: ${nowLabel()}`;
+        await whatsappService.sendMessage(raw, text);
+    } catch (e) {
+        console.error('Erro ao enviar alerta WhatsApp de acesso bloqueado:', e);
+    }
+}
+
+async function getMailerTransporterFromConfig(db) {
+    const cfgHost = await getAppConfigValue(db, 'SMTP_HOST');
+    const cfgPort = await getAppConfigValue(db, 'SMTP_PORT');
+    const cfgUser = await getAppConfigValue(db, 'SMTP_USER');
+    const cfgPass = await getAppConfigValue(db, 'SMTP_PASS');
+    const cfgSecure = await getAppConfigValue(db, 'SMTP_SECURE');
+
+    const envHost = (process.env.SMTP_HOST || '').toString().trim();
+    const envPort = process.env.SMTP_PORT;
+    const envUser = (process.env.EMAIL_USER || process.env.SMTP_USER || '').toString().trim();
+    const envPass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').toString();
+    const envSecureRaw = (process.env.SMTP_SECURE || '');
+
+    const host = envHost ? envHost : ((cfgHost != null && String(cfgHost).trim()) ? String(cfgHost).trim() : '');
+    const port = Number((envPort != null && String(envPort).trim()) ? String(envPort).trim() : ((cfgPort != null && String(cfgPort).trim()) ? String(cfgPort).trim() : 587));
+    const user = envUser ? envUser : ((cfgUser != null && String(cfgUser).trim()) ? String(cfgUser).trim() : '');
+    const pass = envPass ? envPass : ((cfgPass != null && String(cfgPass)) ? String(cfgPass) : '');
+    const secureRaw = (envSecureRaw != null && String(envSecureRaw).trim() !== '') ? String(envSecureRaw).trim() : ((cfgSecure != null && String(cfgSecure).trim() !== '') ? String(cfgSecure).trim() : '');
+    const secure = String(secureRaw).toLowerCase() === 'true' || String(secureRaw) === '1';
+
+    if (!host || !user || !pass) return null;
+
+    return nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: { user, pass }
+    });
+}
+
 // WhatsApp Service
 const whatsappService = require('./whatsappService.js');
 
 const app = express();
-
-// Middleware de validação e tratamento de erros
-app.use((err, req, res, next) => {
-    console.error('Erro global:', err);
-    
-    // Erros de validação
-    if (err.name === 'ValidationError') {
-        return res.status(400).json({
-            success: false,
-            message: 'Dados inválidos',
-            errors: err.details
-        });
-    }
-    
-    // Erros de banco de dados
-    if (err.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({
-            success: false,
-            message: 'Registro já existe'
-        });
-    }
-    
-    // Erro padrão
-    res.status(err.status || 500).json({
-        success: false,
-        message: err.message || 'Erro interno do servidor'
-    });
-});
 
 // Middleware de segurança com CSP ajustada
 app.use((req, res, next) => {
@@ -115,6 +307,13 @@ const authLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+const passwordResetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.RATE_LIMIT_RESET_MAX || 8),
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // Configuração do Multer para uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -124,6 +323,7 @@ const storage = multer.diskStorage({
         cb(null, Date.now() + '-' + file.originalname);
     }
 });
+
 const allowedMimeEnv = process.env.UPLOAD_ALLOWED_MIME;
 const allowedMime = allowedMimeEnv
     ? allowedMimeEnv.split(',').map(v => v.trim()).filter(Boolean)
@@ -247,6 +447,29 @@ function requireAuth(req, res, next) {
     next();
 }
 
+app.use('/anamnese', requireAuth, (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+app.use('/atestados', requireAuth, (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+app.use('/exames', requireAuth, (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+app.use('/evolucoes', requireAuth, (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+app.use('/estoque', requireAuth, (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+app.use('/receitas', requireAuth, (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+app.use('/relatorios-medicos', requireAuth, (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+
+
 // Processamento automático de lembretes pendentes
 let reminderCronStarted = false;
 async function processarLembretesPendentes() {
@@ -312,6 +535,50 @@ async function processarLembretesPendentes() {
     }
 }
 
+async function criarLembretesAniversarioInternos() {
+    try {
+        const db = getDB();
+
+        await db.execute(
+            `INSERT INTO lembretes (
+                paciente_id,
+                profissional_id,
+                tipo,
+                titulo,
+                mensagem,
+                data_envio,
+                status,
+                via_whatsapp,
+                via_email
+            )
+            SELECT
+                p.id,
+                NULL,
+                'aniversario',
+                'Aniversário do paciente',
+                CONCAT('Hoje é aniversário de ', p.nome, '.'),
+                NOW(),
+                'pendente',
+                0,
+                0
+            FROM pacientes p
+            WHERE p.ativo = 1
+              AND p.data_nascimento IS NOT NULL
+              AND DAY(p.data_nascimento) = DAY(CURDATE())
+              AND MONTH(p.data_nascimento) = MONTH(CURDATE())
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM lembretes l
+                  WHERE l.paciente_id = p.id
+                    AND l.tipo = 'aniversario'
+                    AND DATE(l.data_envio) = CURDATE()
+              )`
+        );
+    } catch (error) {
+        console.error('Erro ao criar lembretes internos de aniversário:', error);
+    }
+}
+
 function removeDirRecursive(dirPath) {
     if (!fs.existsSync(dirPath)) return;
     try {
@@ -351,11 +618,56 @@ function normalizeUsuarioTipo(raw) {
     const t0 = (raw == null ? '' : String(raw)).trim().toLowerCase();
     const t = t0 === 'profissional' ? 'medico' : t0;
     const allowed = new Set(['admin', 'medico', 'secretaria', 'paciente']);
-    if (!t) return { tipo: 'secretaria', error: null };
     if (!allowed.has(t)) {
         return { tipo: null, error: 'Tipo inválido. Use: admin, medico, secretaria, paciente' };
     }
     return { tipo: t, error: null };
+}
+
+function normalizeTelefone(raw) {
+    if (raw == null) return null;
+    const s0 = String(raw).trim();
+    if (!s0) return null;
+    const cleaned = s0.replace(/[^0-9+]/g, '');
+    const maxLen = 20;
+    if (cleaned.length > maxLen) {
+        return { error: `Telefone muito longo (máx. ${maxLen} caracteres)` };
+    }
+    return { telefone: cleaned };
+}
+
+function generateAccessToken(bytes = 24) {
+    return crypto.randomBytes(bytes).toString('hex');
+}
+
+let accessHmacSecretCache = null;
+async function getAccessHmacSecret(db) {
+    if (accessHmacSecretCache) return accessHmacSecretCache;
+    const fromConfig = await getAppConfigValue(db, 'ACCESS_HMAC_SECRET');
+    const secret = (fromConfig || process.env.ACCESS_HMAC_SECRET || sessionSecret || 'access_hmac_default').toString();
+    if (secret === 'access_hmac_default') {
+        console.warn('ACCESS_HMAC_SECRET não configurado. Configure no .env ou em Configurações.');
+    }
+    accessHmacSecretCache = secret;
+    return secret;
+}
+
+function buildAccessTokenHash(token, deviceId, qrSeed, secret) {
+    const base = `${token}.${deviceId || ''}.${qrSeed || ''}`;
+    return crypto.createHmac('sha256', secret).update(base).digest('hex');
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+    const toRad = (v) => (Number(v) * Math.PI) / 180;
+    const r = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * r * Math.asin(Math.sqrt(a));
+}
+
+function toShortDateTime(dt) {
+    return dt ? moment(dt).format('DD/MM/YYYY HH:mm:ss') : '';
 }
 
 let usuariosTipoColumnChecked = false;
@@ -381,6 +693,87 @@ async function ensureUsuariosTipoColumn(db) {
     } catch (e) {
         usuariosTipoColumnChecked = false;
     }
+}
+
+async function ensureAccessControlTables(db) {
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS colaboradores (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            usuario_id INT NULL,
+            nome VARCHAR(150) NOT NULL,
+            cpf VARCHAR(14) NOT NULL,
+            empresa VARCHAR(150) NULL,
+            cargo VARCHAR(120) NULL,
+            foto_url VARCHAR(255) NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'ativo',
+            qr_seed VARCHAR(64) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_colaborador_cpf (cpf),
+            INDEX idx_colaborador_status (status),
+            INDEX idx_colaborador_usuario (usuario_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await ensureColaboradorStaticTokenColumn(db);
+
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS access_tokens (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            colaborador_id INT NOT NULL,
+            token_hash CHAR(64) NOT NULL,
+            device_id VARCHAR(128) NULL,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_access_token (token_hash),
+            INDEX idx_access_colaborador (colaborador_id),
+            INDEX idx_access_expires (expires_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS colaborador_devices (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            colaborador_id INT NOT NULL,
+            device_id VARCHAR(128) NOT NULL,
+            label VARCHAR(120) NULL,
+            last_seen DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_colab_device (colaborador_id, device_id),
+            INDEX idx_colab_device (colaborador_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS access_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            colaborador_id INT NULL,
+            status VARCHAR(16) NOT NULL,
+            tipo VARCHAR(16) NOT NULL DEFAULT 'acesso',
+            motivo VARCHAR(255) NULL,
+            local VARCHAR(120) NULL,
+            ip_address VARCHAR(64) NULL,
+            device_id VARCHAR(128) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_access_log_colaborador (colaborador_id),
+            INDEX idx_access_log_status (status),
+            INDEX idx_access_log_tipo (tipo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS ponto_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            colaborador_id INT NOT NULL,
+            tipo VARCHAR(16) NOT NULL,
+            ip_address VARCHAR(64) NULL,
+            device_id VARCHAR(128) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ponto_colaborador (colaborador_id),
+            INDEX idx_ponto_tipo (tipo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
 }
 
 async function extractZipToDir(zipPath, outDir) {
@@ -429,7 +822,7 @@ app.get('/configuracoes/whatsapp', requireAuth, requireAdmin, (req, res) => {
     res.redirect('/whatsapp');
 });
 
-app.get('/whatsapp', requireAuth, (req, res) => {
+app.get('/whatsapp', requireAuth, requireAdmin, (req, res) => {
     res.render('whatsapp-teste', {
         title: 'WhatsApp',
         currentPage: 'whatsapp',
@@ -437,7 +830,7 @@ app.get('/whatsapp', requireAuth, (req, res) => {
     });
 });
 
-app.get('/api/whatsapp/status-teste', requireAuth, (req, res) => {
+app.get('/api/whatsapp/status-teste', requireAuth, requireAdmin, (req, res) => {
     try {
         res.json({ success: true, status: whatsappService.getStatus() });
     } catch (error) {
@@ -445,7 +838,7 @@ app.get('/api/whatsapp/status-teste', requireAuth, (req, res) => {
     }
 });
 
-app.get('/api/whatsapp/qrcode-teste', requireAuth, (req, res) => {
+app.get('/api/whatsapp/qrcode-teste', requireAuth, requireAdmin, (req, res) => {
     try {
         const qrCode = whatsappService.getQRCode();
         if (qrCode && qrCode !== null && qrCode !== '') {
@@ -478,7 +871,72 @@ app.post('/api/whatsapp/start', requireAuth, requireAdmin, async (req, res) => {
         return res.json({ success: true, message: 'Inicialização do WhatsApp iniciada' });
     } catch (error) {
         console.error('Erro ao iniciar WhatsApp via API:', error);
-        return res.status(500).json({ success: false, message: 'Erro ao iniciar WhatsApp' });
+        return res.status(500).json({ success: false, message: 'Erro ao iniciar WhatsApp', error: error.message });
+    }
+});
+
+app.get('/api/whatsapp/teste-voce-mesmo', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const st = whatsappService.getStatus();
+        if (!st || !st.isConnected) {
+            return res.status(400).json({ success: false, message: 'WhatsApp não está conectado' });
+        }
+
+        const db = getDB();
+        const [rows] = await db.execute('SELECT valor FROM app_config WHERE chave = ? LIMIT 1', ['WHATSAPP_NUMBER']);
+        const phoneNumber = rows && rows[0] && rows[0].valor ? String(rows[0].valor).trim() : '';
+        if (!phoneNumber) {
+            return res.status(400).json({ success: false, message: 'Número de envio não configurado' });
+        }
+
+        const msg = `Teste de envio - ${moment().format('DD/MM/YYYY HH:mm:ss')}`;
+        await whatsappService.sendMessage(phoneNumber, msg);
+        return res.json({ success: true, message: `Mensagem de teste enviada para ${phoneNumber}` });
+    } catch (error) {
+        console.error('Erro ao enviar teste para você mesmo:', error);
+        return res.status(500).json({ success: false, message: error.message || 'Erro ao enviar mensagem' });
+    }
+});
+
+app.post('/api/whatsapp/teste-numero', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const st = whatsappService.getStatus();
+        if (!st || !st.isConnected) {
+            return res.status(400).json({ success: false, message: 'WhatsApp não está conectado' });
+        }
+
+        const phoneNumber = (req.body && req.body.phoneNumber != null) ? String(req.body.phoneNumber).trim() : '';
+        const message = (req.body && req.body.message != null) ? String(req.body.message) : '';
+        if (!phoneNumber) {
+            return res.status(400).json({ success: false, message: 'Informe o número de destino' });
+        }
+
+        const msg = message && message.trim() ? message : `Teste de envio - ${moment().format('DD/MM/YYYY HH:mm:ss')}`;
+        await whatsappService.sendMessage(phoneNumber, msg);
+        return res.json({ success: true, message: `Mensagem enviada para ${phoneNumber}` });
+    } catch (error) {
+        console.error('Erro ao enviar teste para número:', error);
+        return res.status(500).json({ success: false, message: error.message || 'Erro ao enviar mensagem' });
+    }
+});
+
+app.post('/api/whatsapp/verify', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const st = whatsappService.getStatus();
+        if (!st || !st.isConnected) {
+            return res.status(400).json({ success: false, error: 'WhatsApp não está conectado' });
+        }
+
+        const phoneNumber = (req.body && req.body.phoneNumber != null) ? String(req.body.phoneNumber).trim() : '';
+        if (!phoneNumber) {
+            return res.status(400).json({ success: false, error: 'Informe o número' });
+        }
+
+        const exists = await whatsappService.verifyNumberExists(phoneNumber);
+        return res.json({ success: true, exists });
+    } catch (error) {
+        console.error('Erro ao verificar número no WhatsApp:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Erro ao verificar número' });
     }
 });
 
@@ -529,6 +987,92 @@ function requireRoles(roles) {
     };
 }
 
+function isSecretaria(req) {
+    return Boolean(req && req.session && req.session.usuario && req.session.usuario.tipo === 'secretaria');
+}
+
+function isAdmin(req) {
+    return Boolean(req && req.session && req.session.usuario && req.session.usuario.tipo === 'admin');
+}
+
+function isMedico(req) {
+    return Boolean(req && req.session && req.session.usuario && req.session.usuario.tipo === 'medico');
+}
+
+function isPaciente(req) {
+    return Boolean(req && req.session && req.session.usuario && req.session.usuario.tipo === 'paciente');
+}
+
+function configFlagEnabled(req, key, defaultValue = false) {
+    const cfg = req && req.res && req.res.locals ? req.res.locals.appConfig : (req && req.app && req.app.locals ? req.app.locals.appConfig : null);
+    const raw = cfg && Object.prototype.hasOwnProperty.call(cfg, key) ? cfg[key] : undefined;
+    if (raw == null) return !!defaultValue;
+    const s = String(raw).trim().toLowerCase();
+    return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+}
+
+function canAccessFinanceiro(req) {
+    if (isAdmin(req)) return true;
+    if (isSecretaria(req)) return true;
+    if (isMedico(req)) return configFlagEnabled(req, 'PERM_FINANCEIRO_MEDICO_VER', false);
+    return false;
+}
+
+function canLancarFinanceiro(req) {
+    if (isAdmin(req)) return true;
+    if (isSecretaria(req)) return true;
+    if (isMedico(req)) return configFlagEnabled(req, 'PERM_FINANCEIRO_MEDICO_LANCAR', false);
+    return false;
+}
+
+function sanitizeProntuarioForRole(prontuario, usuarioTipo) {
+    if (!prontuario || typeof prontuario !== 'object') return prontuario;
+    if (usuarioTipo !== 'secretaria') return prontuario;
+
+    const safe = { ...prontuario };
+    const fields = [
+        'queixa_principal',
+        'historia_doenca',
+        'historia_patologica',
+        'historia_fisiologica',
+        'exame_fisico',
+        'diagnostico',
+        'plano_tratamento',
+        'prognostico',
+        'observacoes'
+    ];
+    for (const f of fields) safe[f] = null;
+    return safe;
+}
+
+function sanitizePacienteForRole(paciente, usuarioTipo) {
+    if (!paciente || typeof paciente !== 'object') return paciente;
+    if (usuarioTipo !== 'secretaria') return paciente;
+
+    const safe = { ...paciente };
+    const fields = ['alergias', 'medicamentos', 'historico_familiar', 'observacoes'];
+    for (const f of fields) safe[f] = null;
+    return safe;
+}
+
+function normalizeDateOnly(value) {
+    if (!value) return value;
+    try {
+        if (value instanceof Date) {
+            // DATE vindo do MySQL pode chegar como Date em UTC 00:00:00 e ao aplicar fuso (GMT-3)
+            // pode “voltar um dia”. Para DATE (sem hora), tratamos como UTC e extraímos só YYYY-MM-DD.
+            return moment(value).utc().format('YYYY-MM-DD');
+        }
+        const s = String(value);
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+        const m = moment(s);
+        if (m.isValid()) return m.utc().format('YYYY-MM-DD');
+        return s;
+    } catch {
+        return value;
+    }
+}
+
 // Função para formatar datas para input HTML
 function formatDateForInput(dateValue) {
     if (!dateValue) return '';
@@ -542,7 +1086,7 @@ function formatDateForInput(dateValue) {
         // Se for objeto Date, converter para string
         if (dateValue instanceof Date) {
             console.log('formatDateForInput - É objeto Date');
-            dateString = dateValue.toISOString().split('T')[0];
+            dateString = moment(dateValue).utc().format('YYYY-MM-DD');
         } else if (typeof dateValue === 'string') {
             console.log('formatDateForInput - É string');
             dateString = dateValue;
@@ -553,26 +1097,19 @@ function formatDateForInput(dateValue) {
         
         console.log('formatDateForInput - String processada:', dateString);
         
-        // Se já estiver no formato YYYY-MM-DD, retorna direto
-        if (dateString && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            console.log('formatDateForInput - Já está no formato correto:', dateString);
-            return dateString;
+        const normalized = normalizeDateOnly(dateString);
+        if (normalized && /^\d{4}-\d{2}-\d{2}$/.test(String(normalized))) {
+            console.log('formatDateForInput - Normalizado:', normalized);
+            return String(normalized);
         }
-        
-        // Tenta converter para objeto Date
-        const date = new Date(dateString);
-        console.log('formatDateForInput - Date object:', date);
-        
-        if (isNaN(date.getTime())) {
+
+        // fallback: tenta interpretar via moment em UTC
+        const m = moment(String(dateString));
+        if (!m.isValid()) {
             console.log('formatDateForInput - Data inválida!');
             return '';
         }
-        
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        
-        const formatted = `${year}-${month}-${day}`;
+        const formatted = m.utc().format('YYYY-MM-DD');
         console.log('formatDateForInput - Formatado:', formatted);
         return formatted;
     } catch (error) {
@@ -757,28 +1294,219 @@ async function logLGPD(usuario_id, acao, tabela, registro_id, dados_anteriores, 
 
 // ROTAS DE AUTENTICAÇÃO
 app.get('/', (req, res) => {
-    res.redirect('/login');
+    try {
+        if (req.session && req.session.usuario && req.session.usuario.nome) {
+            return res.redirect('/dashboard');
+        }
+    } catch (e) {
+        // ignore
+    }
+    return res.redirect('/login');
 });
 
 app.get('/login', (req, res) => {
+    try {
+        if (req.session && req.session.usuario && req.session.usuario.nome) {
+            return res.redirect('/dashboard');
+        }
+    } catch (e) {
+        // ignore
+    }
     const registrar = String(req.query.registrar || '').trim();
     const info = registrar ? 'O cadastro de novos usuários é feito pelo administrador. Após entrar como admin, acesse o menu Usuários.' : null;
-    res.render('login', { error: null, info });
+    res.render('login', { error: null, info, usuario: null, currentPage: '' });
+});
+
+app.get('/forgot-password', (req, res) => {
+    try {
+        if (req.session && req.session.usuario && req.session.usuario.nome) {
+            return res.redirect('/dashboard');
+        }
+    } catch (e) {
+        // ignore
+    }
+    res.render('forgot-password', { error: null, info: null, usuario: null, currentPage: '' });
+});
+
+app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
+    const emailRaw = req.body ? req.body.email : undefined;
+    const email = (emailRaw == null ? '' : String(emailRaw)).trim().toLowerCase();
+    const ttlMinutes = Number(process.env.RESET_PASSWORD_TTL_MINUTES || 15);
+
+    try {
+        const db = getDB();
+
+        const [users] = await db.execute(
+            'SELECT id, email, nome, ativo FROM usuarios WHERE email = ? LIMIT 1',
+            [email]
+        );
+        if (!users.length || !users[0] || !users[0].ativo) {
+            return res.render('forgot-password', {
+                error: 'Não existe usuário ativo com esse e-mail.',
+                info: null
+            });
+        }
+
+        const user = users[0];
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const code = generateResetCode();
+        const tokenHash = sha256Hex(token);
+        const codeHash = await bcrypt.hash(code, 10);
+
+        await db.execute(
+            `INSERT INTO password_resets
+                (user_id, email, token_hash, code_hash, expires_at, used_at, created_at, ip_address, user_agent)
+             VALUES
+                (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NULL, NOW(), ?, ?)`,
+            [
+                user.id,
+                user.email,
+                tokenHash,
+                codeHash,
+                ttlMinutes,
+                req.ip || null,
+                req.get('User-Agent') || null
+            ]
+        );
+
+        const baseUrl = await getAppBaseUrlFromConfig(db, req);
+        const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}` : '';
+
+        const cfgFrom = await getAppConfigValue(db, 'SMTP_FROM');
+        const from = (cfgFrom != null && String(cfgFrom).trim())
+            ? String(cfgFrom).trim()
+            : (process.env.SMTP_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
+        const transporter = await getMailerTransporterFromConfig(db);
+
+        const subject = 'Código para redefinir sua senha';
+        const text =
+            `Olá, ${user.nome || 'usuário'}\n\n` +
+            `Seu código de verificação é: ${code}\n` +
+            `Ele expira em ${ttlMinutes} minutos.\n\n` +
+            (resetLink ? `Link para redefinir: ${resetLink}\n\n` : '') +
+            `Se você não solicitou, ignore este e-mail.`;
+
+        if (transporter) {
+            await transporter.sendMail({
+                from,
+                to: user.email,
+                subject,
+                text
+            });
+        } else {
+            console.warn(`[${nowLabel()}] SMTP não configurado. Código de reset para ${user.email}: ${code}`);
+            if (resetLink) console.warn(`[${nowLabel()}] Link reset: ${resetLink}`);
+        }
+
+        return res.render('forgot-password', {
+            error: null,
+            info: `Código enviado para o seu e-mail. Você tem ${ttlMinutes} minutos para inserir o código e redefinir a senha.`
+        });
+    } catch (e) {
+        console.error('Erro no forgot-password:', e);
+        return res.render('forgot-password', { error: 'Não foi possível processar a solicitação agora. Tente novamente.', info: null });
+    }
+});
+
+app.get('/reset-password', (req, res) => {
+    const token = (req.query && req.query.token) ? String(req.query.token) : '';
+    const email = (req.query && req.query.email) ? String(req.query.email).trim().toLowerCase() : '';
+    res.render('reset-password', { error: null, info: null, token, email });
+});
+
+app.post('/reset-password', passwordResetLimiter, async (req, res) => {
+    const token = req.body ? String(req.body.token || '') : '';
+    const email = req.body ? String(req.body.email || '').trim().toLowerCase() : '';
+    const code = req.body ? String(req.body.code || '').trim() : '';
+    const senha = req.body ? String(req.body.senha || '') : '';
+    const confirmar = req.body ? String(req.body.confirmar || '') : '';
+
+    if (!token || !email || !code || !senha || !confirmar) {
+        return res.render('reset-password', { error: 'Preencha todos os campos.', info: null, token, email });
+    }
+    if (senha !== confirmar) {
+        return res.render('reset-password', { error: 'As senhas não conferem.', info: null, token, email });
+    }
+    const senhaErr = validateStrongPassword(senha);
+    if (senhaErr) {
+        return res.render('reset-password', { error: senhaErr, info: null, token, email });
+    }
+
+    try {
+        const db = getDB();
+        const tokenHash = sha256Hex(token);
+
+        const [rows] = await db.execute(
+            `SELECT pr.id, pr.user_id, pr.code_hash
+             FROM password_resets pr
+             WHERE pr.email = ?
+               AND pr.token_hash = ?
+               AND pr.used_at IS NULL
+               AND pr.expires_at >= NOW()
+             ORDER BY pr.id DESC
+             LIMIT 1`,
+            [email, tokenHash]
+        );
+
+        if (!rows.length) {
+            return res.render('reset-password', { error: 'Token inválido ou expirado. Solicite novamente.', info: null, token, email });
+        }
+
+        const pr = rows[0];
+        const codeOk = await bcrypt.compare(code, String(pr.code_hash || ''));
+        if (!codeOk) {
+            return res.render('reset-password', { error: 'Código inválido.', info: null, token, email });
+        }
+
+        const senhaHash = await bcrypt.hash(senha, 10);
+        await db.execute('UPDATE usuarios SET senha = ? WHERE id = ? LIMIT 1', [senhaHash, pr.user_id]);
+
+        await db.execute('UPDATE password_resets SET used_at = NOW() WHERE id = ? LIMIT 1', [pr.id]);
+        await db.execute('UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [pr.user_id]);
+
+        return res.render('login', { error: null, info: 'Senha redefinida com sucesso. Faça login.' });
+    } catch (e) {
+        console.error('Erro no reset-password:', e);
+        return res.render('reset-password', { error: 'Erro ao redefinir senha. Tente novamente.', info: null, token, email });
+    }
 });
 
 app.post('/login', authLimiter, async (req, res) => {
-    const { email, senha } = req.body;
+    const emailRaw = req.body ? req.body.email : undefined;
+    const senhaRaw = req.body ? req.body.senha : undefined;
+    const email = (emailRaw == null ? '' : String(emailRaw)).trim().toLowerCase();
+    const senha = (senhaRaw == null ? '' : String(senhaRaw));
     try {
         const db = getDB();
         const [usuarios] = await db.execute('SELECT * FROM usuarios WHERE email = ? AND ativo = TRUE', [email]);
         if (usuarios.length === 0) {
+            console.warn(`[${nowLabel()}] LOGIN FALHOU: usuário não encontrado/inativo (${email || '-'})`);
             return res.render('login', { error: 'Usuário ou senha inválidos', info: null });
         }
         
         const usuario = usuarios[0];
-        const senhaValida = await bcrypt.compare(senha, usuario.senha);
+
+        const senhaBanco = usuario && usuario.senha != null ? String(usuario.senha) : '';
+        const pareceBcrypt = senhaBanco.startsWith('$2a$') || senhaBanco.startsWith('$2b$') || senhaBanco.startsWith('$2y$');
+        let senhaValida = false;
+        if (pareceBcrypt) {
+            senhaValida = await bcrypt.compare(senha, senhaBanco);
+        } else {
+            // Compatibilidade: caso tenha sido salvo em texto puro (legado)
+            senhaValida = senha === senhaBanco;
+            if (senhaValida) {
+                try {
+                    const novoHash = await bcrypt.hash(senha, 10);
+                    await db.execute('UPDATE usuarios SET senha = ? WHERE id = ? LIMIT 1', [novoHash, usuario.id]);
+                } catch (e) {
+                    console.error('Erro ao migrar senha legada para bcrypt:', e);
+                }
+            }
+        }
         
         if (!senhaValida) {
+            console.warn(`[${nowLabel()}] LOGIN FALHOU: senha inválida (${email || '-'})`);
             return res.render('login', { error: 'Usuário ou senha inválidos', info: null });
         }
         
@@ -798,21 +1526,21 @@ app.post('/login', authLimiter, async (req, res) => {
         req.session.userAgent = req.get('User-Agent');
         
         // Registrar login no log
-        console.log(`Usuário ${usuario.nome} (${usuario.email}) fez login em ${new Date().toISOString()}`);
+        console.log(`[${nowLabel()}] LOGIN: ${usuario.nome} (${usuario.email})`);
         
         // Registrar no log LGPD
         try {
             await logLGPD(
                 usuario.id, 
-                'LOGIN', 
                 'sessao', 
                 null, 
                 null, 
                 JSON.stringify({ 
-                    login_time: new Date().toISOString(),
+                    login_time: nowIsoLocal(),
                     ip: req.ip,
                     user_agent: req.get('User-Agent')
                 }),
+                null,
                 req
             );
         } catch (logError) {
@@ -822,119 +1550,219 @@ app.post('/login', authLimiter, async (req, res) => {
         res.redirect('/dashboard');
     } catch (error) {
         console.error('Erro no login:', error);
-        res.render('login', { error: 'Erro ao fazer login', info: null });
+        return res.render('login', { error: 'Erro ao fazer login. Tente novamente.', info: null });
     }
 });
 
-// Rota de logout melhorada
-app.get('/logout', async (req, res) => {
+app.get('/logout', (req, res) => {
     try {
-        // Registrar logout no log de auditoria se houver usuário
-        if (req.session.usuario) {
-            console.log(`Usuário ${req.session.usuario.nome} (${req.session.usuario.email}) fez logout`);
-            
-            // Registrar no log LGPD se disponível
-            try {
-                await logLGPD(
-                    req.session.usuario.id, 
-                    'LOGOUT', 
-                    'sessao', 
-                    null, 
-                    JSON.stringify({ login_time: req.session.loginTime }), 
+        const usuarioId = req && req.session && req.session.usuario ? req.session.usuario.id : null;
+        const usuarioTipo = req && req.session && req.session.usuario ? req.session.usuario.tipo : null;
+        const usuarioNome = req && req.session && req.session.usuario ? req.session.usuario.nome : null;
+
+        try {
+            if (usuarioId) {
+                logLGPD(
+                    usuarioId,
+                    'sessao',
+                    null,
+                    null,
+                    JSON.stringify({
+                        logout_time: nowIsoLocal(),
+                        tipo: usuarioTipo,
+                        nome: usuarioNome
+                    }),
                     null,
                     req
                 );
-            } catch (logError) {
-                console.error('Erro ao registrar logout no LGPD:', logError);
             }
+        } catch (e) {
+            // ignore
         }
-        
-        // Destruir sessão
-        req.session.destroy((err) => {
-            if (err) {
-                console.error('Erro ao destruir sessão:', err);
-            }
-            res.redirect('/login');
-        });
-    } catch (error) {
-        console.error('Erro no logout:', error);
-        res.redirect('/login');
+
+        if (req && req.session) {
+            req.session.destroy(() => {
+                try {
+                    res.clearCookie('clinica_session');
+                } catch (e) {
+                    // ignore
+                }
+                return res.redirect('/login');
+            });
+            return;
+        }
+    } catch (e) {
+        // ignore
     }
+    try {
+        res.clearCookie('clinica_session');
+    } catch (e) {
+        // ignore
+    }
+    return res.redirect('/login');
 });
 
 // DASHBOARD
 app.get('/dashboard', requireAuth, async (req, res) => {
     try {
+        if (isSecretaria(req)) {
+            return res.redirect('/agenda');
+        }
+
         const db = getDB();
-        
-        // Estatísticas
+
         const [pacientesCount] = await db.execute('SELECT COUNT(*) as count FROM pacientes WHERE ativo = TRUE');
-        const [consultasHoje] = await db.execute('SELECT COUNT(*) as count FROM agenda WHERE DATE(data_hora) = CURDATE()');
-        const [consultasMes] = await db.execute('SELECT COUNT(*) as count FROM agenda WHERE MONTH(data_hora) = MONTH(CURDATE()) AND YEAR(data_hora) = YEAR(CURDATE())');
-        const [lembretesPendentes] = await db.execute('SELECT COUNT(*) as count FROM lembretes WHERE status = "pendente"');
-        
-        // Receitas do mês
-        const [receitasMes] = await db.execute(`
-            SELECT COALESCE(SUM(valor), 0) as total 
-            FROM financeiro 
-            WHERE tipo = 'receita' 
-            AND MONTH(data_cadastro) = MONTH(CURDATE()) 
-            AND YEAR(data_cadastro) = YEAR(CURDATE())
-        `);
-        
-        // Consultas recentes
-        const [consultasRecentes] = await db.execute(`
-            SELECT a.*, p.nome as paciente_nome 
-            FROM agenda a 
-            JOIN pacientes p ON a.paciente_id = p.id 
-            WHERE a.data_hora >= NOW() - INTERVAL 7 DAY
-            ORDER BY a.data_hora DESC 
-            LIMIT 5
-        `);
-        
-        // Próximas consultas (24 horas)
-        const [proximasConsultas] = await db.execute(`
-            SELECT a.*, p.nome as paciente_nome, pr.nome as profissional_nome
-            FROM agenda a 
-            JOIN pacientes p ON a.paciente_id = p.id 
-            LEFT JOIN profissionais pr ON a.profissional_id = pr.id 
-            WHERE a.data_hora BETWEEN NOW() AND NOW() + INTERVAL 24 HOUR
-            ORDER BY a.data_hora ASC 
-            LIMIT 10
-        `);
-        
-        // Lembretes recentes
-        const [lembretesRecentes] = await db.execute(`
-            SELECT l.*, p.nome as paciente_nome 
-            FROM lembretes l 
-            JOIN pacientes p ON l.paciente_id = p.id 
-            WHERE l.data_envio >= NOW() - INTERVAL 7 DAY
-            ORDER BY l.data_envio DESC 
-            LIMIT 5
-        `);
-        
-        res.render('dashboard/index', { 
-            usuario: req.session.usuario,
+        const [consultasHoje] = await db.execute(
+            'SELECT COUNT(*) as count FROM agendamentos WHERE DATE(data_hora) = CURDATE()'
+        );
+
+        const [proximasConsultas] = await db.execute(
+            `SELECT id, paciente_nome, profissional_nome, data_hora, tipo_consulta
+             FROM agendamentos
+             WHERE data_hora >= NOW()
+             ORDER BY data_hora ASC
+             LIMIT 10`
+        );
+
+        const [consultasRecentes] = await db.execute(
+            `SELECT id, paciente_nome, profissional_nome, data_hora, tipo_consulta
+             FROM agendamentos
+             WHERE data_hora <= NOW()
+             ORDER BY data_hora DESC
+             LIMIT 10`
+        );
+
+        const [lembretesPendentesRows] = await db.execute(
+            "SELECT COUNT(*) as count FROM lembretes WHERE LOWER(status) = 'pendente'"
+        );
+        const [lembretesRecentes] = await db.execute(
+            `SELECT l.id, l.paciente_id, p.nome AS paciente_nome, l.titulo, l.data_envio, l.status
+             FROM lembretes l
+             LEFT JOIN pacientes p ON p.id = l.paciente_id
+             ORDER BY l.data_envio DESC, l.id DESC
+             LIMIT 10`
+        );
+
+        const [acessosRecentes] = await db.execute(
+            `SELECT a.id, a.status, a.tipo, a.motivo, a.local, a.created_at,
+                    c.nome AS colaborador_nome, c.cpf AS colaborador_cpf
+             FROM access_logs a
+             LEFT JOIN colaboradores c ON c.id = a.colaborador_id
+             ORDER BY a.created_at DESC, a.id DESC
+             LIMIT 8`
+        );
+
+        const [receitasMes] = await db.execute(
+            `SELECT COALESCE(SUM(valor), 0) as total
+             FROM financeiro
+             WHERE tipo = 'receita'
+               AND MONTH(data_cadastro) = MONTH(CURDATE())
+               AND YEAR(data_cadastro) = YEAR(CURDATE())`
+        );
+
+        const [consultasSemanaRows] = await db.execute(
+            `SELECT DAYOFWEEK(data_hora) as dow, COUNT(*) as total
+             FROM agendamentos
+             WHERE data_hora >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+             GROUP BY DAYOFWEEK(data_hora)`
+        );
+        const week = [0, 0, 0, 0, 0, 0, 0]; // Seg..Dom
+        for (const r of (consultasSemanaRows || [])) {
+            const dow = Number(r.dow || 0); // 1=Dom ... 7=Sáb
+            const total = Number(r.total || 0);
+            const idx = dow === 1 ? 6 : dow - 2; // 0=Seg ... 6=Dom
+            if (idx >= 0 && idx <= 6) week[idx] = total;
+        }
+
+        return res.render('dashboard/index', {
+            title: 'Dashboard',
             currentPage: 'dashboard',
+            usuario: req.session.usuario,
             estatisticas: {
-                totalPacientes: pacientesCount[0].count,
-                consultasHoje: consultasHoje[0].count,
-                proximasConsultas: proximasConsultas.length,
-                faturamentoMes: parseFloat(receitasMes[0].total) || 0,
-                consultasSemana: [12, 19, 15, 25, 22, 18, 14] // Dados mock para gráfico
+                totalPacientes: Number(pacientesCount?.[0]?.count || 0),
+                consultasHoje: Number(consultasHoje?.[0]?.count || 0),
+                proximasConsultas: Array.isArray(proximasConsultas) ? proximasConsultas.length : 0,
+                faturamentoMes: Number(receitasMes?.[0]?.total || 0),
+                consultasSemana: week
             },
-            proximasConsultas,
-            lembretesPendentes: lembretesPendentes[0].count,
-            consultasRecentes,
-            lembretesRecentes
+            lembretesPendentes: Number(lembretesPendentesRows?.[0]?.count || 0),
+            lembretesRecentes: lembretesRecentes || [],
+            proximasConsultas: proximasConsultas || [],
+            consultasRecentes: consultasRecentes || [],
+            acessosRecentes: acessosRecentes || []
         });
     } catch (error) {
-        console.error('Erro no dashboard:', error);
-        res.render('dashboard/index', { 
-            usuario: req.session.usuario,
+        console.error('Erro ao carregar dashboard:', error);
+        return res.render('dashboard/index', {
+            title: 'Dashboard',
             currentPage: 'dashboard',
+            usuario: req.session.usuario,
+            estatisticas: {
+                totalPacientes: 0,
+                consultasHoje: 0,
+                proximasConsultas: 0,
+                faturamentoMes: 0,
+                consultasSemana: [0, 0, 0, 0, 0, 0, 0]
+            },
+            lembretesPendentes: 0,
+            lembretesRecentes: [],
+            proximasConsultas: [],
+            consultasRecentes: [],
+            acessosRecentes: [],
             error: 'Erro ao carregar dashboard'
         });
+    }
+});
+
+app.get('/dashboard/export', requireAuth, async (req, res) => {
+    try {
+        if (isSecretaria(req)) {
+            return res.redirect('/agenda');
+        }
+
+        const db = getDB();
+
+        const [pacientesCount] = await db.execute('SELECT COUNT(*) as count FROM pacientes WHERE ativo = TRUE');
+        const [consultasHoje] = await db.execute(
+            'SELECT COUNT(*) as count FROM agendamentos WHERE DATE(data_hora) = CURDATE()'
+        );
+        const [receitasMes] = await db.execute(
+            `SELECT COALESCE(SUM(valor), 0) as total
+             FROM financeiro
+             WHERE tipo = 'receita'
+               AND MONTH(data_cadastro) = MONTH(CURDATE())
+               AND YEAR(data_cadastro) = YEAR(CURDATE())`
+        );
+
+        const payload = {
+            exported_at: nowIsoLocal(),
+            estatisticas: {
+                totalPacientes: Number(pacientesCount?.[0]?.count || 0),
+                consultasHoje: Number(consultasHoje?.[0]?.count || 0),
+                faturamentoMes: Number(receitasMes?.[0]?.total || 0)
+            }
+        };
+
+        const format = String(req.query?.format || 'json').toLowerCase();
+        if (format === 'csv') {
+            const csv = [
+                'chave,valor',
+                `totalPacientes,${payload.estatisticas.totalPacientes}`,
+                `consultasHoje,${payload.estatisticas.consultasHoje}`,
+                `faturamentoMes,${payload.estatisticas.faturamentoMes}`
+            ].join('\n');
+
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', 'attachment; filename="dashboard.csv"');
+            return res.send(csv);
+        }
+
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="dashboard.json"');
+        return res.send(JSON.stringify(payload, null, 2));
+    } catch (error) {
+        console.error('Erro ao exportar dashboard:', error);
+        return res.status(500).send('Erro ao exportar dashboard');
     }
 });
 
@@ -946,7 +1774,36 @@ app.get('/perfil', requireAuth, (req, res) => {
     });
 });
 
+app.get('/perfil/export', requireAuth, async (req, res) => {
+    try {
+        const uid = req.session?.usuario?.id;
+        if (!uid) return res.redirect('/perfil');
+
+        const db = getDB();
+        const [rows] = await db.execute(
+            'SELECT id, nome, email, tipo, cpf, telefone, ativo FROM usuarios WHERE id = ? LIMIT 1',
+            [uid]
+        );
+        if (!rows || !rows.length) return res.redirect('/perfil');
+
+        const payload = {
+            exported_at: nowIsoLocal(),
+            usuario: rows[0]
+        };
+
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="meus-dados-${uid}.json"`);
+        return res.status(200).send(JSON.stringify(payload, null, 2));
+    } catch (error) {
+        console.error('Erro ao exportar dados do perfil:', error);
+        return res.redirect('/perfil');
+    }
+});
+
 app.get('/ajuda', requireAuth, (req, res) => {
+    if (isSecretaria(req) || isPaciente(req)) {
+        return res.redirect('/dashboard?error=access_denied');
+    }
     res.render('ajuda', {
         title: 'Ajuda',
         currentPage: 'ajuda',
@@ -954,7 +1811,277 @@ app.get('/ajuda', requireAuth, (req, res) => {
     });
 });
 
-app.get('/prontuarios', requireAuth, (req, res) => {
+app.get('/relatorio-hugo', requireAuth, (req, res) => {
+    const email = (req.session?.usuario?.email || '').toString().trim().toLowerCase();
+    if (email !== 'hugo.leonardo.jobs@gmail.com') {
+        return res.redirect('/dashboard?error=access_denied');
+    }
+    return res.render('relatorio-hugo', {
+        title: 'Relatório de Funcionalidades',
+        currentPage: 'relatorio-hugo',
+        usuario: req.session.usuario
+    });
+});
+
+app.get('/estatisticas', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const db = getDB();
+
+        const [pacientesCount] = await db.execute('SELECT COUNT(*) as count FROM pacientes WHERE ativo = TRUE');
+
+        const [agendamentosHoje] = await db.execute(
+            'SELECT COUNT(*) as count FROM agendamentos WHERE DATE(data_hora) = CURDATE()'
+        );
+
+        const [agendamentosMes] = await db.execute(
+            'SELECT COUNT(*) as count FROM agendamentos WHERE MONTH(data_hora) = MONTH(CURDATE()) AND YEAR(data_hora) = YEAR(CURDATE())'
+        );
+
+        const [statusMesRows] = await db.execute(`
+            SELECT LOWER(COALESCE(status, '')) as status, COUNT(*) as count
+            FROM agendamentos
+            WHERE MONTH(data_hora) = MONTH(CURDATE()) AND YEAR(data_hora) = YEAR(CURDATE())
+            GROUP BY LOWER(COALESCE(status, ''))
+            ORDER BY count DESC
+        `);
+
+        const statusMes = (statusMesRows || []).reduce((acc, row) => {
+            acc[row.status || ''] = Number(row.count || 0);
+            return acc;
+        }, {});
+
+        const [receitasMes] = await db.execute(`
+            SELECT COALESCE(SUM(valor), 0) as total
+            FROM financeiro
+            WHERE tipo = 'receita'
+              AND MONTH(data_cadastro) = MONTH(CURDATE())
+              AND YEAR(data_cadastro) = YEAR(CURDATE())
+        `);
+
+        const [despesasMes] = await db.execute(`
+            SELECT COALESCE(SUM(valor), 0) as total
+            FROM financeiro
+            WHERE tipo = 'despesa'
+              AND MONTH(data_cadastro) = MONTH(CURDATE())
+              AND YEAR(data_cadastro) = YEAR(CURDATE())
+        `);
+
+        const [lembretesStatusRows] = await db.execute(`
+            SELECT LOWER(COALESCE(status, '')) as status, COUNT(*) as count
+            FROM lembretes
+            GROUP BY LOWER(COALESCE(status, ''))
+            ORDER BY count DESC
+        `);
+
+        const lembretesStatus = (lembretesStatusRows || []).reduce((acc, row) => {
+            acc[row.status || ''] = Number(row.count || 0);
+            return acc;
+        }, {});
+
+        const [topProfissionais30] = await db.execute(`
+            SELECT COALESCE(profissional_nome, 'Não informado') as profissional_nome, COUNT(*) as total
+            FROM agendamentos
+            WHERE data_hora >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY COALESCE(profissional_nome, 'Não informado')
+            ORDER BY total DESC, profissional_nome ASC
+            LIMIT 5
+        `);
+
+        const [receitaCategoriaMes] = await db.execute(`
+            SELECT COALESCE(categoria, 'Sem categoria') as categoria, COALESCE(SUM(valor), 0) as total
+            FROM financeiro
+            WHERE tipo = 'receita'
+              AND MONTH(data_cadastro) = MONTH(CURDATE())
+              AND YEAR(data_cadastro) = YEAR(CURDATE())
+            GROUP BY COALESCE(categoria, 'Sem categoria')
+            ORDER BY total DESC, categoria ASC
+            LIMIT 8
+        `);
+
+        const [proximos7Dias] = await db.execute(`
+            SELECT DATE(data_hora) as dia, COUNT(*) as total
+            FROM agendamentos
+            WHERE data_hora >= CURDATE()
+              AND data_hora < DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+            GROUP BY DATE(data_hora)
+            ORDER BY dia ASC
+        `);
+
+        let topPacientesFieis = [];
+        try {
+            const [rows] = await db.execute(`
+                SELECT paciente_id, COALESCE(paciente_nome, 'Não informado') as paciente_nome, COUNT(*) as total
+                FROM agendamentos
+                WHERE data_hora >= DATE_SUB(NOW(), INTERVAL 180 DAY)
+                  AND COALESCE(LOWER(status), '') <> 'cancelado'
+                GROUP BY paciente_id, COALESCE(paciente_nome, 'Não informado')
+                ORDER BY total DESC, paciente_nome ASC
+                LIMIT 10
+            `);
+            topPacientesFieis = rows || [];
+        } catch (e) {
+            console.error('Erro ao calcular topPacientesFieis:', e);
+        }
+
+        let pacientesEmRisco = [];
+        try {
+            const [rows] = await db.execute(`
+                SELECT p.id, p.nome, MAX(a.data_hora) as ultima_visita
+                FROM pacientes p
+                LEFT JOIN agendamentos a
+                  ON a.paciente_id = p.id
+                 AND COALESCE(LOWER(a.status), '') <> 'cancelado'
+                WHERE p.ativo = TRUE
+                GROUP BY p.id, p.nome
+                HAVING (ultima_visita IS NULL OR ultima_visita < DATE_SUB(NOW(), INTERVAL 60 DAY))
+                ORDER BY ultima_visita ASC
+                LIMIT 10
+            `);
+            pacientesEmRisco = rows || [];
+        } catch (e) {
+            console.error('Erro ao calcular pacientesEmRisco:', e);
+        }
+
+        let aniversariantesSemana = [];
+        let aniversariantesMes = [];
+        try {
+            const [rowsSemana] = await db.execute(`
+                SELECT id, nome, data_nascimento
+                FROM pacientes
+                WHERE ativo = TRUE
+                  AND data_nascimento IS NOT NULL
+                  AND DATE_FORMAT(data_nascimento, '%m-%d') BETWEEN DATE_FORMAT(CURDATE(), '%m-%d') AND DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 7 DAY), '%m-%d')
+                ORDER BY DATE_FORMAT(data_nascimento, '%m-%d') ASC, nome ASC
+                LIMIT 20
+            `);
+            aniversariantesSemana = rowsSemana || [];
+        } catch (e) {
+            console.error('Erro ao calcular aniversariantesSemana:', e);
+        }
+        try {
+            const [rowsMes] = await db.execute(`
+                SELECT id, nome, data_nascimento
+                FROM pacientes
+                WHERE ativo = TRUE
+                  AND data_nascimento IS NOT NULL
+                  AND MONTH(data_nascimento) = MONTH(CURDATE())
+                ORDER BY DAY(data_nascimento) ASC, nome ASC
+                LIMIT 50
+            `);
+            aniversariantesMes = rowsMes || [];
+        } catch (e) {
+            console.error('Erro ao calcular aniversariantesMes:', e);
+        }
+
+        let lembretesProximos = [];
+        try {
+            const [rows] = await db.execute(`
+                SELECT l.id, l.data_envio, l.status, l.titulo,
+                       COALESCE(p.nome, 'Não informado') as paciente_nome
+                FROM lembretes l
+                LEFT JOIN pacientes p ON p.id = l.paciente_id
+                WHERE COALESCE(LOWER(l.status), '') = 'pendente'
+                  AND l.data_envio BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 24 HOUR)
+                ORDER BY l.data_envio ASC
+                LIMIT 10
+            `);
+            lembretesProximos = rows.map(r => ({
+                ...r,
+                data_envio: r.data_envio ? moment(r.data_envio).format('DD/MM HH:mm') : null
+            }));
+        } catch (e) {
+            console.error('Erro ao calcular lembretesProximos:', e);
+        }
+
+        let lembretesFalhasRecentes = [];
+        try {
+            const [rows] = await db.execute(`
+                SELECT l.id, l.data_envio, l.status, l.titulo,
+                       COALESCE(l.tentativas, 0) as tentativas,
+                       COALESCE(l.ultimo_erro, NULL) as ultimo_erro,
+                       COALESCE(p.nome, 'Não informado') as paciente_nome
+                FROM lembretes l
+                LEFT JOIN pacientes p ON p.id = l.paciente_id
+                WHERE COALESCE(LOWER(l.status), '') = 'erro'
+                  AND l.data_envio >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY l.data_envio DESC
+                LIMIT 10
+            `);
+            lembretesFalhasRecentes = rows.map(r => ({
+                ...r,
+                data_envio: r.data_envio ? moment(r.data_envio).format('DD/MM HH:mm') : null
+            }));
+        } catch (e) {
+            console.error('Erro ao calcular lembretesFalhasRecentes:', e);
+        }
+
+        const receitas = Number(receitasMes?.[0]?.total || 0);
+        const despesas = Number(despesasMes?.[0]?.total || 0);
+        const totalMes = Number(agendamentosMes?.[0]?.count || 0);
+        const confirmadosMes = (statusMes['confirmado'] || 0) + (statusMes['realizado'] || 0);
+        const taxaConfirmacaoMes = totalMes > 0 ? (confirmadosMes / totalMes) : 0;
+
+        res.render('estatisticas/index', {
+            title: 'Estatísticas',
+            currentPage: 'estatisticas',
+            usuario: req.session.usuario,
+            kpis: {
+                totalPacientes: Number(pacientesCount?.[0]?.count || 0),
+                agendamentosHoje: Number(agendamentosHoje?.[0]?.count || 0),
+                agendamentosMes: totalMes,
+                taxaConfirmacaoMes,
+                receitasMes: receitas,
+                despesasMes: despesas,
+                saldoMes: receitas - despesas,
+                lembretesPendentes: (lembretesStatus['pendente'] || 0),
+                lembretesEnviados: (lembretesStatus['enviado'] || 0),
+                lembretesErro: (lembretesStatus['erro'] || 0)
+            },
+            statusMes,
+            topProfissionais30,
+            topPacientesFieis,
+            pacientesEmRisco,
+            aniversariantesSemana,
+            aniversariantesMes,
+            receitaCategoriaMes,
+            proximos7Dias,
+            lembretesProximos,
+            lembretesFalhasRecentes
+        });
+    } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error);
+        res.render('estatisticas/index', {
+            title: 'Estatísticas',
+            currentPage: 'estatisticas',
+            usuario: req.session.usuario,
+            kpis: {
+                totalPacientes: 0,
+                agendamentosHoje: 0,
+                agendamentosMes: 0,
+                taxaConfirmacaoMes: 0,
+                receitasMes: 0,
+                despesasMes: 0,
+                saldoMes: 0,
+                lembretesPendentes: 0,
+                lembretesEnviados: 0,
+                lembretesErro: 0
+            },
+            statusMes: {},
+            topProfissionais30: [],
+            topPacientesFieis: [],
+            pacientesEmRisco: [],
+            aniversariantesSemana: [],
+            aniversariantesMes: [],
+            receitaCategoriaMes: [],
+            proximos7Dias: [],
+            lembretesProximos: [],
+            lembretesFalhasRecentes: [],
+            error: 'Erro ao carregar estatísticas'
+        });
+    }
+});
+
+app.get('/prontuarios', requireAuth, requireRoles(['admin', 'medico']), (req, res) => {
     (async () => {
         try {
             const db = getDB();
@@ -992,6 +2119,17 @@ app.get('/prontuarios', requireAuth, (req, res) => {
                 params
             );
 
+            const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+            const prontuariosSafe = Array.isArray(prontuarios)
+                ? prontuarios.map(p => {
+                    const safe = sanitizeProntuarioForRole(p, usuarioTipo);
+                    if (safe && typeof safe === 'object') {
+                        safe.data_atendimento = normalizeDateOnly(safe.data_atendimento);
+                    }
+                    return safe;
+                })
+                : prontuarios;
+
             const [pacientes] = await db.execute(
                 'SELECT id, nome, cpf FROM pacientes WHERE ativo = 1 ORDER BY nome ASC LIMIT 500'
             );
@@ -1003,7 +2141,7 @@ app.get('/prontuarios', requireAuth, (req, res) => {
                 title: 'Prontuários',
                 currentPage: 'prontuarios',
                 usuario: req.session.usuario,
-                prontuarios,
+                prontuarios: prontuariosSafe,
                 pacientes,
                 profissionais,
                 filtros: {
@@ -1028,7 +2166,13 @@ app.get('/prontuarios', requireAuth, (req, res) => {
     })();
 });
 
-app.get('/api/prontuarios/:id', requireAuth, async (req, res) => {
+app.get('/prontuarios/paciente/:id', requireAuth, requireRoles(['admin', 'medico']), (req, res) => {
+    const pid = Number(req.params.id);
+    if (!pid) return res.redirect('/pacientes?error=ID%20inv%C3%A1lido');
+    return res.redirect(`/prontuarios?paciente_id=${pid}`);
+});
+
+app.get('/api/prontuarios/:id', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
     try {
         const id = Number(req.params.id);
         if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
@@ -1047,19 +2191,25 @@ app.get('/api/prontuarios/:id', requireAuth, async (req, res) => {
         );
         if (!rows.length) return res.status(404).json({ success: false, message: 'Prontuário não encontrado' });
 
+        const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+        const prontuarioSafe = sanitizeProntuarioForRole(rows[0], usuarioTipo);
+        if (prontuarioSafe && typeof prontuarioSafe === 'object') {
+            prontuarioSafe.data_atendimento = normalizeDateOnly(prontuarioSafe.data_atendimento);
+        }
+
         const [evolucoes] = await db.execute(
             'SELECT * FROM prontuario_evolucoes WHERE prontuario_id = ? ORDER BY data_evolucao DESC, id DESC LIMIT 200',
             [id]
         );
 
-        return res.json({ success: true, prontuario: rows[0], evolucoes });
+        return res.json({ success: true, prontuario: prontuarioSafe, evolucoes });
     } catch (error) {
         console.error('Erro ao carregar prontuário:', error);
         return res.status(500).json({ success: false, message: 'Erro ao carregar prontuário' });
     }
 });
 
-app.post('/prontuarios', requireAuth, async (req, res) => {
+app.post('/prontuarios', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
     try {
         const {
             id,
@@ -1160,7 +2310,7 @@ app.post('/prontuarios', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/prontuarios/:id/evolucoes', requireAuth, async (req, res) => {
+app.post('/prontuarios/:id/evolucoes', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
     try {
         const prontuarioId = Number(req.params.id);
         const { texto } = req.body || {};
@@ -1179,7 +2329,7 @@ app.post('/prontuarios/:id/evolucoes', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/prontuarios/:id/imprimir', requireAuth, async (req, res) => {
+app.get('/prontuarios/:id/imprimir', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
     try {
         const id = Number(req.params.id);
         if (!id) return res.redirect('/prontuarios?error=ID%20inv%C3%A1lido');
@@ -1336,6 +2486,19 @@ app.post('/api/configuracoes', requireAuth, requireAdmin, async (req, res) => {
     } catch (error) {
         console.error('Erro ao salvar configurações:', error);
         return res.status(500).json({ success: false, message: 'Erro ao salvar configurações' });
+    }
+});
+
+app.get('/api/logs', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const limit = Math.min(500, Math.max(10, Number(req.query && req.query.limit ? req.query.limit : 200)));
+        const sinceTs = Number(req.query && req.query.since ? req.query.since : 0);
+        const items = systemLogBuffer
+            .filter(l => !sinceTs || Number(l.ts) > sinceTs)
+            .slice(-limit);
+        return res.json({ success: true, logs: items, now: Date.now() });
+    } catch (e) {
+        return res.status(500).json({ success: false, message: 'Erro ao carregar logs' });
     }
 });
 
@@ -1643,7 +2806,30 @@ app.post('/configuracoes/backup/restore', requireAuth, requireAdmin, upload.sing
 app.get('/financeiro', requireAuth, (req, res) => {
     (async () => {
         try {
+            if (!canAccessFinanceiro(req)) {
+                return res.redirect('/dashboard?error=access_denied');
+            }
             const db = getDB();
+
+            const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+            const isSec = usuarioTipo === 'secretaria';
+            const canLancar = canLancarFinanceiro(req);
+
+            const [pacientes] = await db.execute(
+                'SELECT id, nome, cpf FROM pacientes WHERE ativo = TRUE ORDER BY nome ASC LIMIT 500'
+            );
+
+            if (isSec) {
+                return res.render('financeiro/index', {
+                    title: 'Financeiro',
+                    currentPage: 'financeiro',
+                    usuario: req.session.usuario,
+                    canLancar,
+                    resumo: null,
+                    lancamentos: [],
+                    pacientes
+                });
+            }
 
             const [receitasMes] = await db.execute(`
                 SELECT COALESCE(SUM(valor), 0) as total
@@ -1682,13 +2868,15 @@ app.get('/financeiro', requireAuth, (req, res) => {
                 title: 'Financeiro',
                 currentPage: 'financeiro',
                 usuario: req.session.usuario,
+                canLancar,
                 resumo: {
                     receitasMes: receitas,
                     despesasMes: despesas,
                     saldoMes: receitas - despesas,
                     saldoAcumulado: Number(saldoAcumulado?.[0]?.total || 0)
                 },
-                lancamentos
+                lancamentos,
+                pacientes
             });
         } catch (error) {
             console.error('Erro ao carregar financeiro:', error);
@@ -1696,12 +2884,66 @@ app.get('/financeiro', requireAuth, (req, res) => {
                 title: 'Financeiro',
                 currentPage: 'financeiro',
                 usuario: req.session.usuario,
+                canLancar: false,
                 resumo: { receitasMes: 0, despesasMes: 0, saldoMes: 0, saldoAcumulado: 0 },
                 lancamentos: [],
+                pacientes: [],
                 error: 'Erro ao carregar financeiro'
             });
         }
     })();
+});
+
+app.post('/financeiro/lancamentos', requireAuth, async (req, res) => {
+    try {
+        if (!canLancarFinanceiro(req)) {
+            return res.redirect('/dashboard?error=access_denied');
+        }
+        const db = getDB();
+
+        const tipo = (req.body?.tipo || '').toString().trim().toLowerCase();
+        const descricao = (req.body?.descricao || '').toString().trim();
+        const valorRaw = Number(req.body?.valor);
+        const status = (req.body?.status || 'pendente').toString().trim().toLowerCase();
+        const categoria = (req.body?.categoria || '').toString().trim() || null;
+        const formaPagamento = (req.body?.forma_pagamento || '').toString().trim() || null;
+        const pacienteId = req.body?.paciente_id ? Number(req.body.paciente_id) : null;
+        const dataCadastro = (req.body?.data_cadastro || '').toString().trim();
+
+        if (tipo !== 'receita' && tipo !== 'despesa') {
+            return res.redirect('/financeiro?error=Tipo%20inv%C3%A1lido');
+        }
+        if (!descricao || descricao.length < 2) {
+            return res.redirect('/financeiro?error=Descri%C3%A7%C3%A3o%20inv%C3%A1lida');
+        }
+        if (!Number.isFinite(valorRaw) || valorRaw <= 0) {
+            return res.redirect('/financeiro?error=Valor%20inv%C3%A1lido');
+        }
+        const dt = dataCadastro ? new Date(dataCadastro) : new Date();
+        if (isNaN(dt.getTime())) {
+            return res.redirect('/financeiro?error=Data%20inv%C3%A1lida');
+        }
+        const statusDb = status === 'pago' ? 'pago' : 'pendente';
+
+        let pacienteNome = null;
+        if (pacienteId) {
+            const [pacs] = await db.execute('SELECT nome FROM pacientes WHERE id = ? LIMIT 1', [pacienteId]);
+            pacienteNome = pacs && pacs[0] ? String(pacs[0].nome || '') : null;
+        }
+
+        await db.execute(
+            `INSERT INTO financeiro
+                (tipo, descricao, paciente_id, paciente_nome, agendamento_id, valor, status, data_cadastro, forma_pagamento, categoria)
+             VALUES
+                (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
+            [tipo, descricao, pacienteId, pacienteNome, valorRaw, statusDb, dt, formaPagamento, categoria]
+        );
+
+        return res.redirect('/financeiro?success=Lancamento%20criado');
+    } catch (error) {
+        console.error('Erro ao criar lançamento financeiro:', error);
+        return res.redirect('/financeiro?error=Erro%20ao%20criar%20lan%C3%A7amento');
+    }
 });
 
 async function syncFinanceiroFromAgendamento(db, agendamento) {
@@ -1746,17 +2988,149 @@ async function syncFinanceiroFromAgendamento(db, agendamento) {
     }
 }
 
-app.get('/profissionais', requireAuth, (req, res) => {
-    res.render('profissionais/index', {
-        title: 'Profissionais',
-        currentPage: 'profissionais',
-        usuario: req.session.usuario
-    });
+app.get('/profissionais', requireAuth, requireRoles(['admin', 'medico']), (req, res) => {
+    (async () => {
+        try {
+            const db = getDB();
+            const q = (req.query && req.query.q ? String(req.query.q) : '').trim();
+
+            const where = [];
+            const params = [];
+            if (q) {
+                where.push('(nome LIKE ? OR cpf LIKE ? OR email LIKE ? OR telefone LIKE ? OR registro_profissional LIKE ? OR especialidade LIKE ?)');
+                const like = `%${q}%`;
+                params.push(like, like, like, like, like, like);
+            }
+
+            const sqlWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
+            const [profissionais] = await db.execute(
+                `SELECT id, nome, cpf, especialidade, registro_profissional, telefone, email, data_contratacao, salario, ativo
+                   FROM profissionais
+                   ${sqlWhere}
+                   ORDER BY ativo DESC, nome ASC
+                   LIMIT 1000`,
+                params
+            );
+
+            return res.render('profissionais/index', {
+                title: 'Profissionais',
+                currentPage: 'profissionais',
+                usuario: req.session.usuario,
+                profissionais: profissionais || [],
+                filtros: { q }
+            });
+        } catch (error) {
+            console.error('Erro ao carregar profissionais:', error);
+            return res.render('profissionais/index', {
+                title: 'Profissionais',
+                currentPage: 'profissionais',
+                usuario: req.session.usuario,
+                profissionais: [],
+                filtros: { q: '' },
+                error: 'Erro ao carregar profissionais'
+            });
+        }
+    })();
 });
 
-app.get('/convenios', requireAuth, (req, res) => {
-    res.render('convenios/index', {
-        currentPage: 'convenios',
+app.post('/api/profissionais', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
+    try {
+        const db = getDB();
+        const id = req.body && req.body.id ? Number(req.body.id) : null;
+
+        const nome = (req.body?.nome || '').toString().trim();
+        const cpf = (req.body?.cpf || '').toString().trim();
+        const especialidade = (req.body?.especialidade || '').toString().trim() || null;
+        const registroProfissional = (req.body?.registro_profissional || '').toString().trim() || null;
+        const telefone = (req.body?.telefone || '').toString().trim() || null;
+        const email = (req.body?.email || '').toString().trim() || null;
+        const dataContratacao = (req.body?.data_contratacao || '').toString().trim();
+        const salarioRaw = req.body && typeof req.body.salario !== 'undefined' && req.body.salario !== '' ? Number(req.body.salario) : null;
+
+        if (!nome || nome.length < 2) {
+            return res.status(400).json({ success: false, message: 'Nome inválido' });
+        }
+        if (!cpf || cpf.length < 5) {
+            return res.status(400).json({ success: false, message: 'CPF inválido' });
+        }
+        let dtContr = null;
+        if (dataContratacao) {
+            const dt = new Date(dataContratacao);
+            if (isNaN(dt.getTime())) {
+                return res.status(400).json({ success: false, message: 'Data de contratação inválida' });
+            }
+            dtContr = dt;
+        }
+        let salario = null;
+        if (salarioRaw != null) {
+            if (!Number.isFinite(salarioRaw) || salarioRaw < 0) {
+                return res.status(400).json({ success: false, message: 'Salário inválido' });
+            }
+            salario = salarioRaw;
+        }
+
+        if (id) {
+            const [existing] = await db.execute('SELECT id FROM profissionais WHERE id = ? LIMIT 1', [id]);
+            if (!existing || !existing.length) {
+                return res.status(404).json({ success: false, message: 'Profissional não encontrado' });
+            }
+
+            await db.execute(
+                `UPDATE profissionais
+                    SET nome = ?, cpf = ?, especialidade = ?, registro_profissional = ?, telefone = ?, email = ?, data_contratacao = ?, salario = ?
+                  WHERE id = ?`,
+                [nome, cpf, especialidade, registroProfissional, telefone, email, dtContr, salario, id]
+            );
+            return res.json({ success: true, id });
+        }
+
+        const [result] = await db.execute(
+            `INSERT INTO profissionais (nome, cpf, especialidade, registro_profissional, telefone, email, data_contratacao, salario, ativo)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            [nome, cpf, especialidade, registroProfissional, telefone, email, dtContr, salario]
+        );
+        return res.json({ success: true, id: result.insertId });
+    } catch (error) {
+        if (error && error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ success: false, message: 'Já existe um profissional com este CPF' });
+        }
+        console.error('Erro ao salvar profissional:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao salvar profissional' });
+    }
+});
+
+app.post('/api/profissionais/:id/ativo', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+
+        const ativo = req.body && typeof req.body.ativo !== 'undefined' ? Number(req.body.ativo) : NaN;
+        if (ativo !== 0 && ativo !== 1) {
+            return res.status(400).json({ success: false, message: 'Valor inválido para ativo' });
+        }
+
+        const db = getDB();
+        const [existing] = await db.execute('SELECT id FROM profissionais WHERE id = ? LIMIT 1', [id]);
+        if (!existing || !existing.length) {
+            return res.status(404).json({ success: false, message: 'Profissional não encontrado' });
+        }
+
+        await db.execute('UPDATE profissionais SET ativo = ? WHERE id = ?', [ativo, id]);
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao alterar status do profissional:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao alterar status do profissional' });
+    }
+});
+
+app.get('/convenios', requireAuth, requireRoles(['admin', 'medico']), (req, res) => {
+    return res.redirect('/dashboard?error=modulo_desativado');
+});
+
+app.get('/permissoes', requireAuth, requireAdmin, (req, res) => {
+    res.render('permissoes/index', {
+        title: 'Permissões',
+        currentPage: 'permissoes',
         usuario: req.session.usuario
     });
 });
@@ -1783,6 +3157,74 @@ app.get('/usuarios', requireAuth, requireAdmin, async (req, res) => {
             usuarios: [],
             error: 'Erro ao carregar usuários'
         });
+    }
+});
+
+app.get('/colaboradores', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const db = getDB();
+        await ensureAccessControlTables(db);
+        const [colaboradores] = await db.execute(
+            `SELECT id, nome, cpf, empresa, cargo, foto_url, status, created_at
+             FROM colaboradores
+             ORDER BY id DESC`
+        );
+        res.render('colaboradores/index', {
+            title: 'Colaboradores',
+            currentPage: 'colaboradores',
+            usuario: req.session.usuario,
+            colaboradores
+        });
+    } catch (error) {
+        console.error('Erro ao carregar colaboradores:', error);
+        res.render('colaboradores/index', {
+            title: 'Colaboradores',
+            currentPage: 'colaboradores',
+            usuario: req.session.usuario,
+            colaboradores: [],
+            error: 'Erro ao carregar colaboradores'
+        });
+    }
+});
+
+app.get('/colaboradores/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.redirect('/colaboradores');
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const [rows] = await db.execute(
+            `SELECT id, nome, cpf, empresa, cargo, foto_url, status, created_at
+             FROM colaboradores WHERE id = ? LIMIT 1`,
+            [id]
+        );
+        if (!rows.length) return res.redirect('/colaboradores');
+
+        const [logs] = await db.execute(
+            `SELECT id, status, tipo, motivo, local, ip_address, device_id, created_at
+             FROM access_logs WHERE colaborador_id = ?
+             ORDER BY created_at DESC, id DESC LIMIT 40`,
+            [id]
+        );
+        const [pontos] = await db.execute(
+            `SELECT id, tipo, ip_address, device_id, created_at
+             FROM ponto_logs WHERE colaborador_id = ?
+             ORDER BY created_at DESC, id DESC LIMIT 40`,
+            [id]
+        );
+
+        res.render('colaboradores/show', {
+            title: 'Colaborador',
+            currentPage: 'colaboradores',
+            usuario: req.session.usuario,
+            colaborador: rows[0],
+            logs,
+            pontos
+        });
+    } catch (error) {
+        console.error('Erro ao carregar colaborador:', error);
+        res.redirect('/colaboradores');
     }
 });
 
@@ -1816,7 +3258,11 @@ app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
         }
         const tipo = tipoNorm.tipo;
         const cpf = req.body?.cpf != null ? (req.body.cpf || '').toString().trim() : null;
-        const telefone = req.body?.telefone != null ? (req.body.telefone || '').toString().trim() : null;
+        const telNorm = normalizeTelefone(req.body?.telefone);
+        if (telNorm && telNorm.error) {
+            return res.status(400).json({ success: false, message: telNorm.error });
+        }
+        const telefone = telNorm && Object.prototype.hasOwnProperty.call(telNorm, 'telefone') ? telNorm.telefone : null;
 
         if (!nome || !email || !senha) {
             return res.status(400).json({ success: false, message: 'Campos obrigatórios: nome, email, senha' });
@@ -1845,6 +3291,766 @@ app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
         }
         console.error('Erro ao criar usuário:', error);
         return res.status(500).json({ success: false, message: 'Erro ao criar usuário' });
+    }
+});
+
+app.post('/api/usuarios/:id/ativo', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+
+        const ativo = req.body && typeof req.body.ativo !== 'undefined' ? Number(req.body.ativo) : NaN;
+        if (ativo !== 0 && ativo !== 1) {
+            return res.status(400).json({ success: false, message: 'Valor inválido para ativo' });
+        }
+
+        const adminId = req.session?.usuario?.id;
+        if (adminId && Number(adminId) === id && ativo === 0) {
+            return res.status(400).json({ success: false, message: 'Você não pode inativar seu próprio usuário logado' });
+        }
+
+        const db = getDB();
+        const [existing] = await db.execute('SELECT id, ativo FROM usuarios WHERE id = ? LIMIT 1', [id]);
+        if (!existing || !existing.length) {
+            return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
+        }
+
+        await db.execute('UPDATE usuarios SET ativo = ? WHERE id = ? LIMIT 1', [ativo, id]);
+
+        try {
+            await logLGPD(adminId, 'UPDATE', 'usuarios', id, JSON.stringify({ ativo: existing[0].ativo }), JSON.stringify({ ativo }), req);
+        } catch {}
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao atualizar status do usuário:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao atualizar status do usuário' });
+    }
+});
+
+app.post('/api/colaboradores', requireAuth, requireAdmin, upload.single('foto'), async (req, res) => {
+    try {
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const nome = (req.body?.nome || '').toString().trim();
+        const cpf = (req.body?.cpf || '').toString().trim();
+        const empresa = (req.body?.empresa || '').toString().trim() || null;
+        const cargo = (req.body?.cargo || '').toString().trim() || null;
+        const status = (req.body?.status || 'ativo').toString().trim().toLowerCase();
+        const statusAllowed = new Set(['ativo', 'inativo', 'bloqueado']);
+        if (!statusAllowed.has(status)) {
+            return res.status(400).json({ success: false, message: 'Status inválido' });
+        }
+        if (!nome || !cpf) {
+            return res.status(400).json({ success: false, message: 'Nome e CPF são obrigatórios' });
+        }
+
+        const fotoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+        const qrSeed = generateAccessToken(16);
+        const qrStaticToken = generateAccessToken(16);
+
+        const [existing] = await db.execute('SELECT id FROM colaboradores WHERE cpf = ? LIMIT 1', [cpf]);
+        if (existing.length) {
+            return res.status(409).json({ success: false, message: 'Já existe um colaborador com este CPF' });
+        }
+
+        const [result] = await db.execute(
+            `INSERT INTO colaboradores (nome, cpf, empresa, cargo, foto_url, status, qr_seed, qr_static_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
+            [nome, cpf, empresa, cargo, fotoUrl, status, qrSeed, qrStaticToken]
+        );
+
+        try {
+            await logLGPD(req.session.usuario.id, 'INSERT', 'colaboradores', result.insertId, null,
+                JSON.stringify({ nome, cpf, empresa, cargo, foto_url: fotoUrl, status }), req);
+        } catch {}
+
+        return res.json({ success: true, id: result.insertId });
+    } catch (error) {
+        if (error && error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ success: false, message: 'Já existe um colaborador com este CPF' });
+        }
+        console.error('Erro ao criar colaborador:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao criar colaborador' });
+    }
+});
+
+app.put('/api/colaboradores/:id', requireAuth, requireAdmin, upload.single('foto'), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const nome = (req.body?.nome || '').toString().trim();
+        const cpf = (req.body?.cpf || '').toString().trim();
+        const empresa = (req.body?.empresa || '').toString().trim() || null;
+        const cargo = (req.body?.cargo || '').toString().trim() || null;
+        const status = (req.body?.status || 'ativo').toString().trim().toLowerCase();
+        const statusAllowed = new Set(['ativo', 'inativo', 'bloqueado']);
+        if (!statusAllowed.has(status)) {
+            return res.status(400).json({ success: false, message: 'Status inválido' });
+        }
+        if (!nome || !cpf) {
+            return res.status(400).json({ success: false, message: 'Nome e CPF são obrigatórios' });
+        }
+
+        const [existing] = await db.execute('SELECT * FROM colaboradores WHERE id = ? LIMIT 1', [id]);
+        if (!existing.length) {
+            return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+        }
+
+        const fotoUrl = req.file ? `/uploads/${req.file.filename}` : existing[0].foto_url;
+
+        await db.execute(
+            `UPDATE colaboradores
+             SET nome = ?, cpf = ?, empresa = ?, cargo = ?, foto_url = ?, status = ?
+             WHERE id = ?`,
+            [nome, cpf, empresa, cargo, fotoUrl, status, id]
+        );
+
+        try {
+            await logLGPD(req.session.usuario.id, 'UPDATE', 'colaboradores', id,
+                JSON.stringify(existing[0]), JSON.stringify({ nome, cpf, empresa, cargo, foto_url: fotoUrl, status }), req);
+        } catch {}
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao atualizar colaborador:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao atualizar colaborador' });
+    }
+});
+
+app.post('/api/colaboradores/:id/status', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+        const status = (req.body?.status || '').toString().trim().toLowerCase();
+        const statusAllowed = new Set(['ativo', 'inativo', 'bloqueado']);
+        if (!statusAllowed.has(status)) {
+            return res.status(400).json({ success: false, message: 'Status inválido' });
+        }
+
+        const db = getDB();
+        await ensureAccessControlTables(db);
+        const [existing] = await db.execute('SELECT status FROM colaboradores WHERE id = ? LIMIT 1', [id]);
+        if (!existing.length) return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+
+        await db.execute('UPDATE colaboradores SET status = ? WHERE id = ?', [status, id]);
+        try {
+            await logLGPD(req.session.usuario.id, 'UPDATE', 'colaboradores', id,
+                JSON.stringify({ status: existing[0].status }), JSON.stringify({ status }), req);
+        } catch {}
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao atualizar status do colaborador:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao atualizar status' });
+    }
+});
+
+app.post('/api/colaboradores/:id/qr', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const [rows] = await db.execute('SELECT id, qr_seed, qr_static_token FROM colaboradores WHERE id = ? LIMIT 1', [id]);
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+
+        const qrMode = (await getAppConfigValue(db, 'ACCESS_QR_MODE') || 'fixed').toString().toLowerCase();
+        if (qrMode === 'fixed') {
+            let staticToken = rows[0].qr_static_token;
+            if (!staticToken) {
+                staticToken = generateAccessToken(16);
+                await db.execute('UPDATE colaboradores SET qr_static_token = ? WHERE id = ?', [staticToken, id]);
+            }
+            return res.json({ success: true, token: staticToken, expiresAt: null, mode: 'fixed' });
+        }
+
+        const deviceId = (req.body?.deviceId || '').toString().trim().slice(0, 128);
+        if (!deviceId) return res.status(400).json({ success: false, message: 'deviceId obrigatório' });
+
+        const whitelistEnabled = String(await getAppConfigValue(db, 'ACCESS_DEVICE_WHITELIST_ENABLED') || '0') === '1';
+        const whitelistAutoAdd = String(await getAppConfigValue(db, 'ACCESS_DEVICE_WHITELIST_AUTO_ADD') || '0') === '1';
+        if (whitelistEnabled) {
+            const [allowed] = await db.execute(
+                'SELECT id FROM colaborador_devices WHERE colaborador_id = ? AND device_id = ? LIMIT 1',
+                [id, deviceId]
+            );
+            if (!allowed.length) {
+                if (whitelistAutoAdd) {
+                    await db.execute(
+                        'INSERT INTO colaborador_devices (colaborador_id, device_id, label, last_seen) VALUES (?, ?, ?, NOW())',
+                        [id, deviceId, 'Cadastro automático']
+                    );
+                } else {
+                    return res.status(403).json({ success: false, message: 'Device não autorizado para este colaborador' });
+                }
+            }
+        }
+
+        const token = generateAccessToken(20);
+        const secret = await getAccessHmacSecret(db);
+        const tokenHash = buildAccessTokenHash(token, deviceId, rows[0].qr_seed, secret);
+        const ttlRaw = await getAppConfigValue(db, 'ACCESS_QR_TOKEN_TTL_SEC');
+        const ttlSec = Math.min(300, Math.max(10, Number(ttlRaw || 30)));
+        const expiresAt = moment().add(ttlSec, 'seconds').format('YYYY-MM-DD HH:mm:ss');
+        await db.execute(
+            `INSERT INTO access_tokens (colaborador_id, token_hash, device_id, expires_at)
+             VALUES (?, ?, ?, ?)` ,
+            [id, tokenHash, deviceId, expiresAt]
+        );
+
+        return res.json({ success: true, token, expiresAt, mode: 'dynamic' });
+    } catch (error) {
+        console.error('Erro ao gerar QR token:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao gerar QR token' });
+    }
+});
+
+app.get('/qr/:token', async (req, res) => {
+    try {
+        const token = (req.params.token || '').toString().trim();
+        if (!token) return res.status(400).send('Token inválido');
+
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const qrMode = (await getAppConfigValue(db, 'ACCESS_QR_MODE') || 'fixed').toString().toLowerCase();
+        let tokens = [];
+        if (qrMode === 'fixed') {
+            const [rows] = await db.execute(
+                `SELECT id AS colaborador_id, nome, cpf, empresa, cargo, status, foto_url, qr_seed, qr_static_token
+                 FROM colaboradores WHERE qr_static_token = ? LIMIT 1`,
+                [token]
+            );
+            tokens = rows.map(r => ({
+                id: null,
+                colaborador_id: r.colaborador_id,
+                token_hash: null,
+                expires_at: null,
+                used_at: null,
+                device_id: null,
+                nome: r.nome,
+                cpf: r.cpf,
+                empresa: r.empresa,
+                cargo: r.cargo,
+                status: r.status,
+                foto_url: r.foto_url,
+                qr_seed: r.qr_seed,
+                qr_static_token: r.qr_static_token
+            }));
+        } else {
+            const [rows] = await db.execute(
+                `SELECT t.id, t.colaborador_id, t.token_hash, t.expires_at, t.used_at, t.device_id, c.nome, c.cpf, c.empresa, c.cargo, c.status, c.foto_url, c.qr_seed
+                 FROM access_tokens t
+                 JOIN colaboradores c ON c.id = t.colaborador_id
+                 WHERE t.used_at IS NULL
+                 ORDER BY t.id DESC LIMIT 6`
+            );
+            tokens = rows;
+        }
+
+        let found = null;
+        if (qrMode === 'fixed') {
+            found = tokens && tokens.length ? tokens[0] : null;
+        } else {
+            const secret = await getAccessHmacSecret(db);
+            for (const row of tokens) {
+                const hash = buildAccessTokenHash(token, row.device_id || '', row.qr_seed, secret);
+                if (hash === row.token_hash) {
+                    found = row;
+                    break;
+                }
+            }
+        }
+
+        const colaborador = found || null;
+        return res.render('acesso/choose', {
+            title: 'QR Code',
+            currentPage: 'acesso',
+            usuario: null,
+            token,
+            colaborador
+        });
+    } catch (error) {
+        console.error('Erro ao abrir QR:', error);
+        return res.status(500).send('Erro ao abrir QR');
+    }
+});
+
+app.get('/qr/:token/acesso', async (req, res) => {
+    try {
+        const token = (req.params.token || '').toString().trim();
+        if (!token) return res.status(400).send('Token inválido');
+
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const qrMode = (await getAppConfigValue(db, 'ACCESS_QR_MODE') || 'fixed').toString().toLowerCase();
+        let tokens = [];
+        if (qrMode === 'fixed') {
+            const [rows] = await db.execute(
+                `SELECT id AS colaborador_id, nome, cpf, empresa, cargo, status, foto_url, qr_seed, qr_static_token
+                 FROM colaboradores WHERE qr_static_token = ? LIMIT 1`,
+                [token]
+            );
+            tokens = rows.map(r => ({
+                id: null,
+                colaborador_id: r.colaborador_id,
+                token_hash: null,
+                expires_at: null,
+                used_at: null,
+                device_id: null,
+                nome: r.nome,
+                cpf: r.cpf,
+                empresa: r.empresa,
+                cargo: r.cargo,
+                status: r.status,
+                foto_url: r.foto_url,
+                qr_seed: r.qr_seed,
+                qr_static_token: r.qr_static_token
+            }));
+        } else {
+            const [rows] = await db.execute(
+                `SELECT t.id, t.colaborador_id, t.token_hash, t.expires_at, t.used_at, t.device_id, c.nome, c.cpf, c.empresa, c.cargo, c.status, c.foto_url, c.qr_seed
+                 FROM access_tokens t
+                 JOIN colaboradores c ON c.id = t.colaborador_id
+                 WHERE t.used_at IS NULL
+                 ORDER BY t.id DESC LIMIT 6`
+            );
+            tokens = rows;
+        }
+
+        let found = null;
+        if (qrMode === 'fixed') {
+            found = tokens && tokens.length ? tokens[0] : null;
+        } else {
+            const secret = await getAccessHmacSecret(db);
+            for (const row of tokens) {
+                const hash = buildAccessTokenHash(token, row.device_id || '', row.qr_seed, secret);
+                if (hash === row.token_hash) {
+                    found = row;
+                    break;
+                }
+            }
+        }
+
+        let status = 'negado';
+        let motivo = 'Token inválido ou expirado';
+        let colaborador = null;
+
+        if (found) {
+            const isExpired = found.expires_at ? moment(found.expires_at).isBefore(moment()) : false;
+            colaborador = found;
+            if (isExpired) {
+                status = 'negado';
+                motivo = 'QR expirado';
+            } else if (found.status === 'ativo') {
+                status = 'autorizado';
+                motivo = 'Acesso liberado';
+            } else if (found.status === 'inativo') {
+                status = 'restrito';
+                motivo = 'Acesso restrito';
+            } else {
+                status = 'negado';
+                motivo = 'Colaborador bloqueado';
+            }
+
+            if (qrMode !== 'fixed') {
+                const [upd] = await db.execute('UPDATE access_tokens SET used_at = NOW() WHERE id = ? AND used_at IS NULL', [found.id]);
+                if (!upd || !upd.affectedRows) {
+                    status = 'negado';
+                    motivo = 'QR já utilizado';
+                }
+            }
+        }
+
+        const ipAddress = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString();
+        const deviceId = (req.query?.deviceId || '').toString().trim() || null;
+        await db.execute(
+            `INSERT INTO access_logs (colaborador_id, status, tipo, motivo, local, ip_address, device_id)
+             VALUES (?, ?, 'acesso', ?, ?, ?, ?)` ,
+            [colaborador ? colaborador.colaborador_id : null, status, motivo, req.query?.local || null, ipAddress, deviceId]
+        );
+
+        if (colaborador && colaborador.status === 'bloqueado') {
+            await notifyBlockedAccessAttempt(db, colaborador, motivo, req);
+            await notifyBlockedAccessAttemptWhatsapp(db, colaborador, motivo);
+        }
+
+        return res.render('acesso/scan', {
+            title: 'Controle de Acesso',
+            currentPage: 'acesso',
+            usuario: null,
+            status,
+            motivo,
+            colaborador
+        });
+    } catch (error) {
+        console.error('Erro ao validar QR (acesso):', error);
+        return res.status(500).send('Erro ao validar QR');
+    }
+});
+
+app.get('/qr/:token/ponto', async (req, res) => {
+    try {
+        const token = (req.params.token || '').toString().trim();
+        if (!token) return res.status(400).send('Token inválido');
+
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const qrMode = (await getAppConfigValue(db, 'ACCESS_QR_MODE') || 'fixed').toString().toLowerCase();
+        let tokens = [];
+        if (qrMode === 'fixed') {
+            const [rows] = await db.execute(
+                `SELECT id AS colaborador_id, nome, cpf, empresa, cargo, status, foto_url, qr_seed, qr_static_token
+                 FROM colaboradores WHERE qr_static_token = ? LIMIT 1`,
+                [token]
+            );
+            tokens = rows.map(r => ({
+                id: null,
+                colaborador_id: r.colaborador_id,
+                token_hash: null,
+                expires_at: null,
+                used_at: null,
+                device_id: null,
+                nome: r.nome,
+                cpf: r.cpf,
+                empresa: r.empresa,
+                cargo: r.cargo,
+                status: r.status,
+                foto_url: r.foto_url,
+                qr_seed: r.qr_seed,
+                qr_static_token: r.qr_static_token
+            }));
+        } else {
+            const [rows] = await db.execute(
+                `SELECT t.id, t.colaborador_id, t.token_hash, t.expires_at, t.used_at, t.device_id, c.nome, c.cpf, c.empresa, c.cargo, c.status, c.foto_url, c.qr_seed
+                 FROM access_tokens t
+                 JOIN colaboradores c ON c.id = t.colaborador_id
+                 WHERE t.used_at IS NULL
+                 ORDER BY t.id DESC LIMIT 6`
+            );
+            tokens = rows;
+        }
+
+        let found = null;
+        if (qrMode === 'fixed') {
+            found = tokens && tokens.length ? tokens[0] : null;
+        } else {
+            const secret = await getAccessHmacSecret(db);
+            for (const row of tokens) {
+                const hash = buildAccessTokenHash(token, row.device_id || '', row.qr_seed, secret);
+                if (hash === row.token_hash) {
+                    found = row;
+                    break;
+                }
+            }
+        }
+
+        return res.render('ponto/registrar', {
+            title: 'Marcar Ponto',
+            currentPage: 'acesso',
+            usuario: null,
+            token,
+            colaborador: found || null
+        });
+    } catch (error) {
+        console.error('Erro ao abrir QR (ponto):', error);
+        return res.status(500).send('Erro ao abrir QR');
+    }
+});
+
+app.post('/api/ponto/registrar', async (req, res) => {
+    try {
+        const token = (req.body?.token || '').toString().trim();
+        if (!token) return res.status(400).json({ success: false, message: 'Token inválido' });
+
+        const db = getDB();
+        await ensureAccessControlTables(db);
+        const deviceIdRaw = (req.body?.deviceId || '').toString().trim();
+        if (!deviceIdRaw) return res.status(400).json({ success: false, message: 'deviceId obrigatório' });
+        const deviceId = deviceIdRaw.slice(0, 128);
+        const ipAddress = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString();
+        const rateIpLimitRaw = await getAppConfigValue(db, 'ACCESS_PONTO_RATE_IP_LIMIT');
+        const rateIpWindowRaw = await getAppConfigValue(db, 'ACCESS_PONTO_RATE_IP_WINDOW_SEC');
+        const rateIpLimit = Math.min(60, Math.max(2, Number(rateIpLimitRaw || 10)));
+        const rateIpWindowMs = Math.min(600, Math.max(30, Number(rateIpWindowRaw || 60))) * 1000;
+        const rateKey = `${ipAddress}|${deviceId}`;
+        if (!checkPontoRateLimit(rateKey, rateIpLimit, rateIpWindowMs)) {
+            return res.status(429).json({ success: false, message: 'Muitas tentativas. Aguarde e tente novamente.' });
+        }
+
+        const qrMode = (await getAppConfigValue(db, 'ACCESS_QR_MODE') || 'fixed').toString().toLowerCase();
+        let found = null;
+        if (qrMode === 'fixed') {
+            const [rows] = await db.execute(
+                'SELECT id AS colaborador_id, status, qr_seed, qr_static_token FROM colaboradores WHERE qr_static_token = ? LIMIT 1',
+                [token]
+            );
+            found = rows && rows.length ? rows[0] : null;
+        } else {
+            const [tokens] = await db.execute(
+                `SELECT t.id, t.colaborador_id, t.token_hash, t.expires_at, t.used_at, t.device_id, c.status, c.qr_seed
+                 FROM access_tokens t
+                 JOIN colaboradores c ON c.id = t.colaborador_id
+                 WHERE t.used_at IS NULL
+                 ORDER BY t.id DESC LIMIT 6`
+            );
+
+            const secret = await getAccessHmacSecret(db);
+            for (const row of tokens) {
+                const hash = buildAccessTokenHash(token, row.device_id || '', row.qr_seed, secret);
+                if (hash === row.token_hash) {
+                    found = row;
+                    break;
+                }
+            }
+        }
+
+        if (!found) {
+            return res.status(404).json({ success: false, message: 'Token inválido ou expirado' });
+        }
+        if (found.expires_at && moment(found.expires_at).isBefore(moment())) {
+            return res.status(400).json({ success: false, message: 'Token expirado' });
+        }
+        if (found.device_id && found.device_id !== deviceId) {
+            return res.status(403).json({ success: false, message: 'Device inválido' });
+        }
+
+        const whitelistEnabled = String(await getAppConfigValue(db, 'ACCESS_DEVICE_WHITELIST_ENABLED') || '0') === '1';
+        const whitelistAutoAdd = String(await getAppConfigValue(db, 'ACCESS_DEVICE_WHITELIST_AUTO_ADD') || '0') === '1';
+        if (whitelistEnabled) {
+            const [allowed] = await db.execute(
+                'SELECT id FROM colaborador_devices WHERE colaborador_id = ? AND device_id = ? LIMIT 1',
+                [found.colaborador_id, deviceId]
+            );
+            if (!allowed.length) {
+                if (whitelistAutoAdd) {
+                    await db.execute(
+                        'INSERT INTO colaborador_devices (colaborador_id, device_id, label, last_seen) VALUES (?, ?, ?, NOW())',
+                        [found.colaborador_id, deviceId, 'Cadastro automático']
+                    );
+                } else {
+                    return res.status(403).json({ success: false, message: 'Device não autorizado para este colaborador' });
+                }
+            } else {
+                await db.execute('UPDATE colaborador_devices SET last_seen = NOW() WHERE id = ?', [allowed[0].id]);
+            }
+        }
+        if (found.status !== 'ativo') {
+            return res.status(403).json({ success: false, message: 'Colaborador sem autorização' });
+        }
+
+        const requireGeo = String(await getAppConfigValue(db, 'ACCESS_REQUIRE_GEO') || '0') === '1';
+        if (requireGeo) {
+            const baseLat = Number(await getAppConfigValue(db, 'ACCESS_GEO_LAT'));
+            const baseLng = Number(await getAppConfigValue(db, 'ACCESS_GEO_LNG'));
+            const radius = Math.max(10, Number(await getAppConfigValue(db, 'ACCESS_GEO_RADIUS_METERS') || 200));
+            const lat = Number(req.body?.geoLat);
+            const lng = Number(req.body?.geoLng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(baseLat) || !Number.isFinite(baseLng)) {
+                return res.status(400).json({ success: false, message: 'Geolocalização obrigatória' });
+            }
+            const dist = haversineMeters(baseLat, baseLng, lat, lng);
+            if (dist > radius) {
+                return res.status(403).json({ success: false, message: 'Fora da área autorizada' });
+            }
+        }
+
+        const requireSsid = String(await getAppConfigValue(db, 'ACCESS_REQUIRE_SSID') || '0') === '1';
+        if (requireSsid) {
+            const allowedSsid = (await getAppConfigValue(db, 'ACCESS_ALLOWED_SSID') || '').toString().trim();
+            const ssid = (req.body?.ssid || '').toString().trim();
+            if (!ssid || !allowedSsid || ssid !== allowedSsid) {
+                return res.status(403).json({ success: false, message: 'SSID não autorizado' });
+            }
+        }
+
+        const tipo = (req.body?.tipo || '').toString().trim().toLowerCase();
+        const tipoAllowed = new Set(['entrada', 'saida']);
+        if (!tipoAllowed.has(tipo)) {
+            return res.status(400).json({ success: false, message: 'Tipo inválido' });
+        }
+
+        const [lastPontoRows] = await db.execute(
+            `SELECT tipo
+             FROM ponto_logs
+             WHERE colaborador_id = ?
+             ORDER BY id DESC
+             LIMIT 1`,
+            [found.colaborador_id]
+        );
+        const lastTipo = lastPontoRows && lastPontoRows.length ? (lastPontoRows[0].tipo || '').toString().toLowerCase() : '';
+        if (!lastTipo) {
+            if (tipo === 'saida') {
+                return res.status(409).json({ success: false, message: 'Não é possível registrar saída sem uma entrada anterior.' });
+            }
+        } else {
+            if (lastTipo === tipo) {
+                if (tipo === 'entrada') {
+                    return res.status(409).json({ success: false, message: 'Entrada já registrada. Registre a saída antes de registrar uma nova entrada.' });
+                }
+                return res.status(409).json({ success: false, message: 'Saída já registrada. Registre a entrada antes de registrar uma nova saída.' });
+            }
+        }
+
+        const dupMinutesRaw = await getAppConfigValue(db, 'ACCESS_PONTO_DUP_MINUTES');
+        const dupMinutes = Math.min(15, Math.max(1, Number(dupMinutesRaw || 3)));
+        const [recentPonto] = await db.execute(
+            `SELECT id
+             FROM ponto_logs
+             WHERE colaborador_id = ?
+               AND tipo = ?
+               AND created_at >= DATE_SUB(NOW(), INTERVAL ${dupMinutes} MINUTE)
+             ORDER BY id DESC
+             LIMIT 1`,
+            [found.colaborador_id, tipo]
+        );
+        if (recentPonto && recentPonto.length) {
+            return res.status(409).json({ success: false, message: 'Ponto duplicado detectado. Aguarde alguns minutos.' });
+        }
+
+        const rateColabLimitRaw = await getAppConfigValue(db, 'ACCESS_PONTO_RATE_COLAB_LIMIT');
+        const rateColabWindowRaw = await getAppConfigValue(db, 'ACCESS_PONTO_RATE_COLAB_WINDOW_SEC');
+        const rateColabLimit = Math.min(60, Math.max(2, Number(rateColabLimitRaw || 6)));
+        const rateColabWindowMs = Math.min(600, Math.max(30, Number(rateColabWindowRaw || 60))) * 1000;
+        const rateKeyColab = `colab|${found.colaborador_id}`;
+        if (!checkPontoRateLimit(rateKeyColab, rateColabLimit, rateColabWindowMs)) {
+            return res.status(429).json({ success: false, message: 'Muitas tentativas para este colaborador. Aguarde e tente novamente.' });
+        }
+
+        if (qrMode !== 'fixed' && found.id) {
+            await db.execute('UPDATE access_tokens SET used_at = NOW() WHERE id = ? AND used_at IS NULL', [found.id]);
+        }
+        await db.execute(
+            `INSERT INTO ponto_logs (colaborador_id, tipo, ip_address, device_id)
+             VALUES (?, ?, ?, ?)` ,
+            [found.colaborador_id, tipo, ipAddress, deviceId]
+        );
+
+        await db.execute(
+            `INSERT INTO access_logs (colaborador_id, status, tipo, motivo, local, ip_address, device_id)
+             VALUES (?, 'autorizado', 'ponto', ?, ?, ?, ?)` ,
+            [found.colaborador_id, `Ponto ${tipo} registrado`, req.body?.local || null, ipAddress, deviceId]
+        );
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao registrar ponto:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao registrar ponto' });
+    }
+});
+
+app.get('/api/colaboradores/:id/devices', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+        const db = getDB();
+        await ensureAccessControlTables(db);
+        const [rows] = await db.execute(
+            'SELECT id, device_id, label, last_seen, created_at FROM colaborador_devices WHERE colaborador_id = ? ORDER BY created_at DESC',
+            [id]
+        );
+        return res.json({ success: true, devices: rows || [] });
+    } catch (error) {
+        console.error('Erro ao carregar devices do colaborador:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao carregar devices' });
+    }
+});
+
+app.post('/api/colaboradores/:id/devices', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+        const deviceId = (req.body?.deviceId || '').toString().trim().slice(0, 128);
+        if (!deviceId) return res.status(400).json({ success: false, message: 'deviceId obrigatório' });
+        const label = (req.body?.label || '').toString().trim().slice(0, 120) || null;
+        const db = getDB();
+        await ensureAccessControlTables(db);
+        await db.execute(
+            'INSERT INTO colaborador_devices (colaborador_id, device_id, label, last_seen) VALUES (?, ?, ?, NOW())',
+            [id, deviceId, label]
+        );
+        return res.json({ success: true });
+    } catch (error) {
+        if (error && error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ success: false, message: 'Device já cadastrado' });
+        }
+        console.error('Erro ao cadastrar device:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao cadastrar device' });
+    }
+});
+
+app.delete('/api/colaboradores/:id/devices/:deviceId', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+        const deviceId = (req.params.deviceId || '').toString().trim();
+        if (!deviceId) return res.status(400).json({ success: false, message: 'deviceId obrigatório' });
+        const db = getDB();
+        await ensureAccessControlTables(db);
+        await db.execute('DELETE FROM colaborador_devices WHERE colaborador_id = ? AND device_id = ?', [id, deviceId]);
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao remover device:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao remover device' });
+    }
+});
+
+app.post('/api/usuarios/:id/tipo', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+
+        const adminSenha = (req.body?.adminSenha || '').toString();
+        if (!adminSenha) {
+            return res.status(400).json({ success: false, message: 'Senha do admin é obrigatória' });
+        }
+
+        const tipoNorm = normalizeUsuarioTipo(req.body?.tipo);
+        if (tipoNorm.error) {
+            return res.status(400).json({ success: false, message: tipoNorm.error });
+        }
+        const novoTipo = tipoNorm.tipo;
+
+        const adminId = req.session?.usuario?.id;
+        const db = getDB();
+        await ensureUsuariosTipoColumn(db);
+
+        const [admins] = await db.execute('SELECT id, senha FROM usuarios WHERE id = ? AND ativo = TRUE LIMIT 1', [adminId]);
+        if (!admins.length) {
+            return res.status(403).json({ success: false, message: 'Admin inválido' });
+        }
+        const adminSenhaValida = await bcrypt.compare(adminSenha, admins[0].senha);
+        if (!adminSenhaValida) {
+            return res.status(403).json({ success: false, message: 'Senha do admin inválida' });
+        }
+
+        if (adminId && Number(adminId) === id && novoTipo !== 'admin') {
+            return res.status(400).json({ success: false, message: 'Você não pode remover seu próprio acesso de admin' });
+        }
+
+        const [existing] = await db.execute('SELECT id, tipo FROM usuarios WHERE id = ? LIMIT 1', [id]);
+        if (!existing || !existing.length) {
+            return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
+        }
+
+        await db.execute('UPDATE usuarios SET tipo = ? WHERE id = ? LIMIT 1', [novoTipo, id]);
+
+        try {
+            await logLGPD(adminId, 'UPDATE', 'usuarios', id, JSON.stringify({ tipo: existing[0].tipo }), JSON.stringify({ tipo: novoTipo }), req);
+        } catch {}
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao atualizar tipo do usuário:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao atualizar tipo do usuário' });
     }
 });
 
@@ -1927,7 +4133,7 @@ app.get('/auditoria', requireAuth, requireAdmin, async (req, res) => {
 
         const [logs] = await db.execute(sql, params);
 
-        res.render('auditoria/index', {
+        return res.render('auditoria/index', {
             title: 'Auditoria',
             currentPage: 'auditoria',
             usuario: req.session.usuario,
@@ -1936,39 +4142,203 @@ app.get('/auditoria', requireAuth, requireAdmin, async (req, res) => {
         });
     } catch (error) {
         console.error('Erro ao carregar auditoria:', error);
-        res.render('auditoria/index', {
+        return res.render('auditoria/index', {
             title: 'Auditoria',
             currentPage: 'auditoria',
             usuario: req.session.usuario,
             logs: [],
             filtros: { q: '', acao: '', tabela: '', limit: 200 },
-            error: 'Erro ao carregar auditoria: ' + error.message
+            error: 'Erro ao carregar auditoria'
         });
     }
 });
 
-// PACIENTES
-app.get('/pacientes', requireAuth, async (req, res) => {
+app.get('/acessos', requireAuth, requireAdmin, async (req, res) => {
     try {
         const db = getDB();
-        const [pacientes] = await db.execute('SELECT * FROM pacientes WHERE ativo = TRUE ORDER BY nome');
-        res.render('pacientes/lista', { pacientes, usuario: req.session.usuario });
+        await ensureAccessControlTables(db);
+
+        const q = (req.query?.q || '').toString().trim();
+        const status = (req.query?.status || '').toString().trim();
+        const tipo = (req.query?.tipo || '').toString().trim();
+        const limitRaw = Number(req.query?.limit || 200);
+        const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 200;
+
+        const where = [];
+        const params = [];
+        if (q) {
+            where.push('(c.nome LIKE ? OR c.cpf LIKE ? OR a.motivo LIKE ? OR a.local LIKE ?)');
+            const like = `%${q}%`;
+            params.push(like, like, like, like);
+        }
+        if (status) {
+            where.push('a.status = ?');
+            params.push(status);
+        }
+        if (tipo) {
+            where.push('a.tipo = ?');
+            params.push(tipo);
+        }
+
+        const sqlWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
+        const [logs] = await db.execute(
+            `SELECT a.id, a.status, a.tipo, a.motivo, a.local, a.ip_address, a.device_id, a.created_at,
+                    c.id AS colaborador_id, c.nome AS colaborador_nome, c.cpf AS colaborador_cpf
+             FROM access_logs a
+             LEFT JOIN colaboradores c ON c.id = a.colaborador_id
+             ${sqlWhere}
+             ORDER BY a.created_at DESC, a.id DESC
+             LIMIT ${limit}`,
+            params
+        );
+
+        const [chartRows] = await db.execute(
+            `SELECT DATE(a.created_at) AS dia, a.status, COUNT(*) AS total
+             FROM access_logs a
+             WHERE a.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+             GROUP BY DATE(a.created_at), a.status
+             ORDER BY dia ASC`
+        );
+        const dias = [];
+        for (let i = 6; i >= 0; i -= 1) {
+            dias.push(moment().subtract(i, 'days').format('YYYY-MM-DD'));
+        }
+        const statusList = ['autorizado', 'restrito', 'negado'];
+        const chartData = {};
+        statusList.forEach((st) => { chartData[st] = dias.map(() => 0); });
+        (chartRows || []).forEach((row) => {
+            const idx = dias.indexOf(moment(row.dia).format('YYYY-MM-DD'));
+            if (idx >= 0 && chartData[row.status]) {
+                chartData[row.status][idx] = Number(row.total || 0);
+            }
+        });
+
+        return res.render('acessos/index', {
+            title: 'Acessos',
+            currentPage: 'acessos',
+            usuario: req.session.usuario,
+            logs,
+            filtros: { q, status, tipo, limit },
+            chart: { dias, series: chartData }
+        });
+    } catch (error) {
+        console.error('Erro ao carregar acessos:', error);
+        return res.render('acessos/index', {
+            title: 'Acessos',
+            currentPage: 'acessos',
+            usuario: req.session.usuario,
+            logs: [],
+            filtros: { q: '', status: '', tipo: '', limit: 200 },
+            chart: { dias: [], series: { autorizado: [], restrito: [], negado: [] } },
+            error: 'Erro ao carregar acessos'
+        });
+    }
+});
+
+app.get('/acessos/export', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const db = getDB();
+        await ensureAccessControlTables(db);
+
+        const q = (req.query?.q || '').toString().trim();
+        const status = (req.query?.status || '').toString().trim();
+        const tipo = (req.query?.tipo || '').toString().trim();
+
+        const where = [];
+        const params = [];
+        if (q) {
+            where.push('(c.nome LIKE ? OR c.cpf LIKE ? OR a.motivo LIKE ? OR a.local LIKE ?)');
+            const like = `%${q}%`;
+            params.push(like, like, like, like);
+        }
+        if (status) {
+            where.push('a.status = ?');
+            params.push(status);
+        }
+        if (tipo) {
+            where.push('a.tipo = ?');
+            params.push(tipo);
+        }
+        const sqlWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
+        const [rows] = await db.execute(
+            `SELECT a.created_at, a.status, a.tipo, a.motivo, a.local, a.ip_address, a.device_id,
+                    c.nome AS colaborador_nome, c.cpf AS colaborador_cpf
+             FROM access_logs a
+             LEFT JOIN colaboradores c ON c.id = a.colaborador_id
+             ${sqlWhere}
+             ORDER BY a.created_at DESC, a.id DESC`,
+            params
+        );
+
+        const header = 'data_hora;colaborador;cpf;status;tipo;motivo;local;ip;device\n';
+        const lines = (rows || []).map((r) => {
+            const parts = [
+                toShortDateTime(r.created_at),
+                r.colaborador_nome || 'Visitante',
+                r.colaborador_cpf || '',
+                r.status || '',
+                r.tipo || '',
+                (r.motivo || '').replace(/\n/g, ' '),
+                r.local || '',
+                r.ip_address || '',
+                r.device_id || ''
+            ];
+            return parts.map((p) => String(p || '').replace(/;/g, ',')).join(';');
+        });
+
+        const csv = header + lines.join('\n');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="acessos.csv"');
+        return res.send(csv);
+    } catch (error) {
+        console.error('Erro ao exportar acessos:', error);
+        return res.status(500).send('Erro ao exportar');
+    }
+});
+
+// PACIENTES
+app.get('/pacientes', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
+    try {
+        const db = getDB();
+        const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+        const [pacientes] = await db.execute(
+            `SELECT
+                id, nome, cpf, rg, data_nascimento, sexo, telefone, email,
+                endereco, cidade, estado, cep,
+                convenio, numero_convenio, validade_convenio,
+                ativo
+             FROM pacientes
+             WHERE ativo = TRUE
+             ORDER BY nome`
+        );
+        const pacientesSafe = Array.isArray(pacientes)
+            ? pacientes.map(p => sanitizePacienteForRole(p, usuarioTipo))
+            : pacientes;
+        res.render('pacientes/lista', { pacientes: pacientesSafe, usuario: req.session.usuario });
     } catch (error) {
         console.error('Erro ao listar pacientes:', error);
         res.render('pacientes/lista', { pacientes: [], usuario: req.session.usuario });
     }
 });
 
-app.get('/pacientes/novo', requireAuth, (req, res) => {
-    res.render('pacientes/form', { paciente: null, usuario: req.session.usuario, error: null });
+app.get('/pacientes/novo', requireAuth, requireRoles(['admin', 'medico']), (req, res) => {
+    const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+    const pacienteSafe = sanitizePacienteForRole(null, usuarioTipo);
+    res.render('pacientes/form', { paciente: pacienteSafe, usuario: req.session.usuario, error: null });
 });
 
-app.post('/pacientes', requireAuth, async (req, res) => {
+app.post('/pacientes', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
     try {
         console.log('POST /pacientes - Criando novo paciente');
         console.log('Dados recebidos:', req.body);
         
-        const { nome, cpf, rg, data_nascimento, sexo, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, validade_convenio, alergias, medicamentos, historico_familiar, observacoes } = req.body;
+        const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+        const isSec = usuarioTipo === 'secretaria';
+        const { nome, cpf, rg, data_nascimento, sexo, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, validade_convenio } = req.body;
+        const alergias = isSec ? null : (req.body ? req.body.alergias : null);
+        const medicamentos = isSec ? null : (req.body ? req.body.medicamentos : null);
+        const historico_familiar = isSec ? null : (req.body ? req.body.historico_familiar : null);
+        const observacoes = isSec ? null : (req.body ? req.body.observacoes : null);
         const db = getDB();
         const sexoDb = await resolveSexoDbValue(db, sexo);
         
@@ -2009,7 +4379,7 @@ app.post('/pacientes', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/pacientes/:id/editar', requireAuth, async (req, res) => {
+app.get('/pacientes/:id/editar', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
     try {
         console.log('=== GET /pacientes/:id/editar ===');
         console.log('ID do paciente:', req.params.id);
@@ -2019,7 +4389,8 @@ app.get('/pacientes/:id/editar', requireAuth, async (req, res) => {
         
         console.log('Paciente encontrado no banco:', pacientes.length > 0 ? 'SIM' : 'NÃO');
         if (pacientes.length > 0) {
-            const paciente = pacientes[0];
+            const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+            const paciente = sanitizePacienteForRole(pacientes[0], usuarioTipo);
             paciente.sexo = normalizeSexoForForm(paciente.sexo);
             console.log('Dados do paciente:', {
                 id: paciente.id,
@@ -2053,14 +4424,20 @@ app.get('/pacientes/:id/editar', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/pacientes/:id/editar', requireAuth, async (req, res) => {
+app.post('/pacientes/:id/editar', requireAuth, requireRoles(['admin', 'medico']), async (req, res) => {
     try {
         console.log('=== POST /pacientes/:id/editar ===');
         console.log('ID do paciente:', req.params.id);
         console.log('Todos os dados recebidos:', Object.keys(req.body));
         console.log('Dados recebidos:', req.body);
-        
-        const { nome, cpf, rg, data_nascimento, sexo, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, validade_convenio, alergias, medicamentos, historico_familiar, observacoes } = req.body;
+
+        const usuarioTipo = req.session && req.session.usuario ? req.session.usuario.tipo : null;
+        const isSec = usuarioTipo === 'secretaria';
+        const { nome, cpf, rg, data_nascimento, sexo, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, validade_convenio } = req.body;
+        const alergias = isSec ? undefined : (req.body ? req.body.alergias : undefined);
+        const medicamentos = isSec ? undefined : (req.body ? req.body.medicamentos : undefined);
+        const historico_familiar = isSec ? undefined : (req.body ? req.body.historico_familiar : undefined);
+        const observacoes = isSec ? undefined : (req.body ? req.body.observacoes : undefined);
         const db = getDB();
         const sexoDb = await resolveSexoDbValue(db, sexo);
         
@@ -2097,10 +4474,17 @@ app.post('/pacientes/:id/editar', requireAuth, async (req, res) => {
         console.log('Paciente encontrado no banco:', pacienteAntigo[0].nome);
         console.log('Executando UPDATE no banco...');
         
-        await db.execute(
-            'UPDATE pacientes SET nome = ?, cpf = ?, rg = ?, data_nascimento = ?, sexo = ?, telefone = ?, email = ?, endereco = ?, cidade = ?, estado = ?, cep = ?, convenio = ?, numero_convenio = ?, validade_convenio = ?, alergias = ?, medicamentos = ?, historico_familiar = ?, observacoes = ? WHERE id = ?',
-            [nome, cpf, rg, data_nascimento, sexoDb, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, validade_convenio, alergias, medicamentos, historico_familiar, observacoes, req.params.id]
-        );
+        if (isSec) {
+            await db.execute(
+                'UPDATE pacientes SET nome = ?, cpf = ?, rg = ?, data_nascimento = ?, sexo = ?, telefone = ?, email = ?, endereco = ?, cidade = ?, estado = ?, cep = ?, convenio = ?, numero_convenio = ?, validade_convenio = ? WHERE id = ?',
+                [nome, cpf, rg, data_nascimento, sexoDb, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, validade_convenio, req.params.id]
+            );
+        } else {
+            await db.execute(
+                'UPDATE pacientes SET nome = ?, cpf = ?, rg = ?, data_nascimento = ?, sexo = ?, telefone = ?, email = ?, endereco = ?, cidade = ?, estado = ?, cep = ?, convenio = ?, numero_convenio = ?, validade_convenio = ?, alergias = ?, medicamentos = ?, historico_familiar = ?, observacoes = ? WHERE id = ?',
+                [nome, cpf, rg, data_nascimento, sexoDb, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, validade_convenio, alergias, medicamentos, historico_familiar, observacoes, req.params.id]
+            );
+        }
         
         console.log('✅ Update executado com sucesso!');
         
@@ -2127,7 +4511,7 @@ app.post('/pacientes/:id/editar', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/pacientes/:id/excluir', requireAuth, async (req, res) => {
+app.post('/pacientes/:id/excluir', requireAuth, requireAdmin, async (req, res) => {
     try {
         const db = getDB();
         const [pacienteAntigo] = await db.execute('SELECT * FROM pacientes WHERE id = ?', [req.params.id]);
@@ -2143,16 +4527,57 @@ app.post('/pacientes/:id/excluir', requireAuth, async (req, res) => {
 });
 
 // AGENDAMENTOS
-app.get('/agendamentos', requireAuth, async (req, res) => {
+app.get('/agendamentos', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         let agendamentos = [];
+        const filtros = {
+            status: (req.query?.status == null ? '' : String(req.query.status)).trim(),
+            profissional_id: (req.query?.profissional_id == null ? '' : String(req.query.profissional_id)).trim(),
+            periodo: (req.query?.periodo == null ? '' : String(req.query.periodo)).trim()
+        };
+
+        const where = [];
+        const params = [];
+        if (filtros.status) {
+            where.push('LOWER(status) = ?');
+            params.push(String(filtros.status).toLowerCase());
+        }
+        if (filtros.profissional_id) {
+            where.push('profissional_id = ?');
+            params.push(Number(filtros.profissional_id));
+        }
+        if (filtros.periodo) {
+            const p = String(filtros.periodo).toLowerCase();
+            if (p === 'hoje') {
+                where.push('DATE(data_hora) = CURDATE()');
+            } else if (p === 'semana') {
+                where.push('YEARWEEK(data_hora, 1) = YEARWEEK(CURDATE(), 1)');
+            } else if (p === 'mes') {
+                where.push('MONTH(data_hora) = MONTH(CURDATE()) AND YEAR(data_hora) = YEAR(CURDATE())');
+            }
+        }
+
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        let profissionais = [];
+        try {
+            const [rowsProf] = await db.execute(
+                'SELECT id, nome FROM profissionais WHERE ativo = 1 ORDER BY nome ASC LIMIT 500'
+            );
+            profissionais = rowsProf || [];
+        } catch (e) {
+            profissionais = [];
+        }
+
         try {
             const [rows] = await db.execute(
                 `SELECT id, paciente_id, paciente_nome, paciente_cpf, profissional_id, profissional_nome, data_hora, duracao_minutos, tipo_consulta, status, observacoes, valor, forma_pagamento, status_pagamento, convenio, enviar_lembrete, confirmar_whatsapp
                  FROM agendamentos
+                 ${whereSql}
                  ORDER BY data_hora DESC, id DESC
-                 LIMIT 200`
+                 LIMIT 200`,
+                params
             );
             agendamentos = rows;
         } catch (e) {
@@ -2192,8 +4617,10 @@ app.get('/agendamentos', requireAuth, async (req, res) => {
                 const [rows2] = await db.execute(
                     `SELECT id, paciente_id, paciente_nome, paciente_cpf, profissional_id, profissional_nome, data_hora, duracao_minutos, tipo_consulta, status, observacoes
                      FROM agendamentos
+                     ${whereSql}
                      ORDER BY id DESC
-                     LIMIT 200`
+                     LIMIT 200`,
+                    params
                 );
                 agendamentos = rows2;
             } else {
@@ -2207,6 +4634,8 @@ app.get('/agendamentos', requireAuth, async (req, res) => {
             usuario: req.session.usuario,
             success: req.query.success || null,
             error: req.query.error || null,
+            filtros,
+            profissionais,
             agendamentos
         });
     } catch (error) {
@@ -2215,13 +4644,119 @@ app.get('/agendamentos', requireAuth, async (req, res) => {
             title: 'Agendamentos',
             currentPage: 'agendamentos',
             usuario: req.session.usuario,
+            filtros: {
+                status: '',
+                profissional_id: '',
+                periodo: ''
+            },
+            profissionais: [],
             agendamentos: [],
             error: 'Erro ao listar agendamentos'
         });
     }
 });
 
-app.get('/agendamentos/novo', requireAuth, async (req, res) => {
+app.get('/agendamentos/export', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    try {
+        const db = getDB();
+        const filtros = {
+            status: (req.query?.status == null ? '' : String(req.query.status)).trim(),
+            profissional_id: (req.query?.profissional_id == null ? '' : String(req.query.profissional_id)).trim(),
+            periodo: (req.query?.periodo == null ? '' : String(req.query.periodo)).trim()
+        };
+
+        const where = [];
+        const params = [];
+        if (filtros.status) {
+            where.push('LOWER(status) = ?');
+            params.push(String(filtros.status).toLowerCase());
+        }
+        if (filtros.profissional_id) {
+            where.push('profissional_id = ?');
+            params.push(Number(filtros.profissional_id));
+        }
+        if (filtros.periodo) {
+            const p = String(filtros.periodo).toLowerCase();
+            if (p === 'hoje') {
+                where.push('DATE(data_hora) = CURDATE()');
+            } else if (p === 'semana') {
+                where.push('YEARWEEK(data_hora, 1) = YEARWEEK(CURDATE(), 1)');
+            } else if (p === 'mes') {
+                where.push('MONTH(data_hora) = MONTH(CURDATE()) AND YEAR(data_hora) = YEAR(CURDATE())');
+            }
+        }
+
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+        const [rows] = await db.execute(
+            `SELECT id, paciente_nome, paciente_cpf, profissional_nome, data_hora, duracao_minutos, tipo_consulta, status
+             FROM agendamentos
+             ${whereSql}
+             ORDER BY data_hora DESC, id DESC
+             LIMIT 1000`,
+            params
+        );
+
+        const format = String(req.query?.format || 'csv').toLowerCase();
+        if (format === 'json') {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Content-Disposition', 'attachment; filename="agendamentos.json"');
+            return res.send(JSON.stringify({ exported_at: nowIsoLocal(), filtros, agendamentos: rows || [] }, null, 2));
+        }
+
+        const escapeCsv = (v) => {
+            if (v == null) return '';
+            const s = String(v);
+            if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        };
+
+        const header = ['id', 'paciente', 'cpf', 'profissional', 'data_hora', 'duracao_minutos', 'tipo_consulta', 'status'];
+        const lines = [header.join(',')];
+        for (const a of (rows || [])) {
+            lines.push([
+                escapeCsv(a.id),
+                escapeCsv(a.paciente_nome),
+                escapeCsv(a.paciente_cpf),
+                escapeCsv(a.profissional_nome),
+                escapeCsv(a.data_hora),
+                escapeCsv(a.duracao_minutos),
+                escapeCsv(a.tipo_consulta),
+                escapeCsv(a.status)
+            ].join(','));
+        }
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="agendamentos.csv"');
+        return res.send(lines.join('\n'));
+    } catch (error) {
+        console.error('Erro ao exportar agendamentos:', error);
+        return res.status(500).send('Erro ao exportar agendamentos');
+    }
+});
+
+app.get('/api/pacientes/:id/agendamentos', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    try {
+        const pacienteId = Number(req.params.id);
+        if (!pacienteId) return res.status(400).json({ success: false, message: 'ID inválido' });
+
+        const db = getDB();
+        const [rows] = await db.execute(
+            `SELECT id, data_hora, duracao_minutos, tipo_consulta, status, profissional_nome, observacoes
+               FROM agendamentos
+              WHERE paciente_id = ?
+              ORDER BY data_hora DESC, id DESC
+              LIMIT 200`,
+            [pacienteId]
+        );
+
+        return res.json({ success: true, agendamentos: rows || [] });
+    } catch (error) {
+        console.error('Erro ao listar agendamentos do paciente:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao listar agendamentos do paciente' });
+    }
+});
+
+app.get('/agendamentos/novo', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const [pacientes] = await db.execute(
@@ -2245,7 +4780,7 @@ app.get('/agendamentos/novo', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/agendamentos', requireAuth, async (req, res) => {
+app.post('/agendamentos', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const {
             paciente_id,
@@ -2448,7 +4983,7 @@ app.post('/agendamentos', requireAuth, async (req, res) => {
 });
 
 // AGENDA
-app.get('/agenda', requireAuth, async (req, res) => {
+app.get('/agenda', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
 
@@ -2533,8 +5068,336 @@ app.get('/agenda', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/agenda/export', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    try {
+        const db = getDB();
+
+        const data = req.query.data || moment().format('YYYY-MM-DD');
+        const periodo = req.query.periodo ? String(req.query.periodo) : '';
+        const status = req.query.status ? String(req.query.status).toLowerCase() : '';
+        const profissionalId = req.query.profissional_id ? Number(req.query.profissional_id) : null;
+
+        let startDate = moment(data, 'YYYY-MM-DD').startOf('day');
+        let endDate = moment(data, 'YYYY-MM-DD').endOf('day');
+        if (periodo === 'hoje') {
+            startDate = moment().startOf('day');
+            endDate = moment().endOf('day');
+        } else if (periodo === 'semana') {
+            startDate = moment().startOf('isoWeek');
+            endDate = moment().endOf('isoWeek');
+        } else if (periodo === 'mes') {
+            startDate = moment().startOf('month');
+            endDate = moment().endOf('month');
+        }
+
+        const where = ['data_hora >= ? AND data_hora <= ?'];
+        const params = [startDate.format('YYYY-MM-DD HH:mm:ss'), endDate.format('YYYY-MM-DD HH:mm:ss')];
+        if (status) {
+            where.push('LOWER(status) = ?');
+            params.push(status);
+        }
+        if (profissionalId) {
+            where.push('profissional_id = ?');
+            params.push(profissionalId);
+        }
+
+        const filtros = {
+            data,
+            periodo,
+            status,
+            profissional_id: profissionalId ? String(profissionalId) : ''
+        };
+
+        const [rows] = await db.execute(
+            `SELECT id, paciente_nome, paciente_cpf, profissional_nome, data_hora, duracao_minutos, tipo_consulta, status
+             FROM agendamentos
+             WHERE ${where.join(' AND ')}
+             ORDER BY data_hora ASC, id ASC
+             LIMIT 2000`,
+            params
+        );
+
+        const format = String(req.query?.format || 'csv').toLowerCase();
+        if (format === 'json') {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Content-Disposition', 'attachment; filename="agenda.json"');
+            return res.send(JSON.stringify({ exported_at: nowIsoLocal(), filtros, agenda: rows || [] }, null, 2));
+        }
+
+        const escapeCsv = (v) => {
+            if (v == null) return '';
+            const s = String(v);
+            if (/[\",\n]/.test(s)) return '"' + s.replace(/\"/g, '""') + '"';
+            return s;
+        };
+
+        const header = ['id', 'paciente', 'cpf', 'profissional', 'data_hora', 'duracao_minutos', 'tipo_consulta', 'status'];
+        const lines = [header.join(',')];
+        for (const a of (rows || [])) {
+            lines.push([
+                escapeCsv(a.id),
+                escapeCsv(a.paciente_nome),
+                escapeCsv(a.paciente_cpf),
+                escapeCsv(a.profissional_nome),
+                escapeCsv(a.data_hora),
+                escapeCsv(a.duracao_minutos),
+                escapeCsv(a.tipo_consulta),
+                escapeCsv(a.status)
+            ].join(','));
+        }
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="agenda.csv"');
+        return res.send(lines.join('\n'));
+    } catch (error) {
+        console.error('Erro ao exportar agenda:', error);
+        return res.status(500).send('Erro ao exportar agenda');
+    }
+});
+
+function formatDateTimeForInput(dt) {
+    try {
+        if (!dt) return '';
+        const d = dt instanceof Date ? dt : new Date(dt);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+        return '';
+    }
+}
+
+app.get('/agendamentos/:id/editar', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.redirect('/agenda?error=ID%20inv%C3%A1lido');
+
+        const db = getDB();
+        const [rows] = await db.execute(
+            `SELECT id, paciente_id, paciente_nome, paciente_cpf, profissional_id, profissional_nome,
+                    data_hora, duracao_minutos, tipo_consulta, status, observacoes,
+                    valor, forma_pagamento, status_pagamento, convenio, enviar_lembrete, confirmar_whatsapp
+               FROM agendamentos
+              WHERE id = ?
+              LIMIT 1`,
+            [id]
+        );
+        if (!rows.length) return res.redirect('/agenda?error=Agendamento%20n%C3%A3o%20encontrado');
+
+        const agendamento = rows[0];
+        agendamento.data_hora_form = formatDateTimeForInput(agendamento.data_hora);
+
+        const [pacientes] = await db.execute(
+            'SELECT id, nome, cpf FROM pacientes WHERE ativo = 1 ORDER BY nome ASC LIMIT 500'
+        );
+        const [profissionais] = await db.execute(
+            'SELECT id, nome FROM profissionais WHERE ativo = 1 ORDER BY nome ASC LIMIT 200'
+        );
+
+        const redirectTo = req.query && req.query.redirect_to ? String(req.query.redirect_to) : '/agenda';
+
+        return res.render('agendamentos/form-editar', {
+            title: 'Editar Agendamento',
+            currentPage: 'agenda',
+            usuario: req.session.usuario,
+            agendamento,
+            pacientes,
+            profissionais,
+            redirectTo,
+            error: null
+        });
+    } catch (error) {
+        console.error('Erro ao abrir edição de agendamento:', error);
+        return res.redirect('/agenda?error=Erro%20ao%20abrir%20edi%C3%A7%C3%A3o');
+    }
+});
+
+app.get('/agendamentos/:id/remarcar', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.redirect('/agenda?error=ID%20inv%C3%A1lido');
+    return res.redirect(`/agendamentos/${id}/editar?redirect_to=${encodeURIComponent('/agenda')}`);
+});
+
+app.post('/agendamentos/:id/status', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+
+        const status = (req.body?.status || '').toString().trim().toLowerCase();
+        const allowed = new Set(['agendado', 'confirmado', 'realizado', 'cancelado']);
+        if (!allowed.has(status)) {
+            return res.status(400).json({ success: false, message: 'Status inválido' });
+        }
+
+        const db = getDB();
+        const [rows] = await db.execute('SELECT id FROM agendamentos WHERE id = ? LIMIT 1', [id]);
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Agendamento não encontrado' });
+
+        await db.execute('UPDATE agendamentos SET status = ? WHERE id = ?', [status, id]);
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao atualizar status do agendamento:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao atualizar status' });
+    }
+});
+
+app.post('/agendamentos/:id/cancelar', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ success: false, message: 'ID inválido' });
+
+        const db = getDB();
+        const [rows] = await db.execute('SELECT id FROM agendamentos WHERE id = ? LIMIT 1', [id]);
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Agendamento não encontrado' });
+
+        await db.execute('UPDATE agendamentos SET status = ? WHERE id = ?', ['cancelado', id]);
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao cancelar agendamento:', error);
+        return res.status(500).json({ success: false, message: 'Erro ao cancelar agendamento' });
+    }
+});
+
+app.post('/agendamentos/:id/editar', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.redirect('/agenda?error=ID%20inv%C3%A1lido');
+
+        const redirectTo = (req.body && req.body.redirect_to) ? String(req.body.redirect_to) : '/agenda';
+
+        const paciente_id = req.body?.paciente_id ? Number(req.body.paciente_id) : null;
+        const profissional_id = req.body?.profissional_id ? Number(req.body.profissional_id) : null;
+        const data_hora = (req.body?.data_hora || '').toString().trim();
+        const duracao_minutos = req.body?.duracao_minutos ? Number(req.body.duracao_minutos) : NaN;
+        const tipo_consulta = (req.body?.tipo_consulta || '').toString().trim();
+        const observacoes = (req.body?.observacoes || '').toString();
+        const valor = req.body?.valor !== '' && req.body?.valor != null ? Number(req.body.valor) : null;
+        const forma_pagamento = (req.body?.forma_pagamento || '').toString().trim() || null;
+        const status_pagamento = (req.body?.status_pagamento || '').toString().trim().toLowerCase() || null;
+        const convenio = (req.body?.convenio || '').toString().trim() || null;
+        const status = (req.body?.status || '').toString().trim().toLowerCase() || 'agendado';
+        const enviar_lembrete = req.body?.enviar_lembrete ? 1 : 0;
+        const confirmar_whatsapp = req.body?.confirmar_whatsapp ? 1 : 0;
+
+        if (!paciente_id || !profissional_id || !data_hora || !Number.isFinite(duracao_minutos) || duracao_minutos <= 0 || !tipo_consulta) {
+            const db = getDB();
+            const [pacientes] = await db.execute(
+                'SELECT id, nome, cpf FROM pacientes WHERE ativo = 1 ORDER BY nome ASC LIMIT 500'
+            );
+            const [profissionais] = await db.execute(
+                'SELECT id, nome FROM profissionais WHERE ativo = 1 ORDER BY nome ASC LIMIT 200'
+            );
+            const [rows] = await db.execute(
+                `SELECT id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, observacoes,
+                        valor, forma_pagamento, status_pagamento, convenio, enviar_lembrete, confirmar_whatsapp
+                   FROM agendamentos WHERE id = ? LIMIT 1`,
+                [id]
+            );
+            const agendamento = rows && rows[0] ? rows[0] : { id };
+            agendamento.paciente_id = paciente_id;
+            agendamento.profissional_id = profissional_id;
+            agendamento.data_hora_form = data_hora;
+            agendamento.duracao_minutos = duracao_minutos;
+            agendamento.tipo_consulta = tipo_consulta;
+            agendamento.observacoes = observacoes;
+            agendamento.valor = valor;
+            agendamento.forma_pagamento = forma_pagamento;
+            agendamento.status_pagamento = status_pagamento;
+            agendamento.convenio = convenio;
+            agendamento.status = status;
+            agendamento.enviar_lembrete = enviar_lembrete;
+            agendamento.confirmar_whatsapp = confirmar_whatsapp;
+
+            return res.render('agendamentos/form-editar', {
+                title: 'Editar Agendamento',
+                currentPage: 'agenda',
+                usuario: req.session.usuario,
+                agendamento,
+                pacientes,
+                profissionais,
+                redirectTo,
+                error: 'Preencha os campos obrigatórios.'
+            });
+        }
+
+        const dt = new Date(data_hora);
+        if (isNaN(dt.getTime())) {
+            return res.redirect(`${redirectTo}?error=Data%20inv%C3%A1lida`);
+        }
+
+        const allowedStatus = new Set(['agendado', 'confirmado', 'realizado', 'cancelado']);
+        const statusFinal = allowedStatus.has(status) ? status : 'agendado';
+        const allowedStatusPag = new Set(['pendente', 'pago', 'cancelado']);
+        const statusPagFinal = status_pagamento && allowedStatusPag.has(status_pagamento) ? status_pagamento : null;
+
+        const db = getDB();
+
+        const [pacRows] = await db.execute('SELECT nome, cpf FROM pacientes WHERE id = ? AND ativo = 1 LIMIT 1', [paciente_id]);
+        if (!pacRows.length) return res.redirect(`${redirectTo}?error=Paciente%20inv%C3%A1lido`);
+        const pacienteNome = String(pacRows[0].nome || '');
+        const pacienteCpf = String(pacRows[0].cpf || '');
+
+        const [prRows] = await db.execute('SELECT nome FROM profissionais WHERE id = ? AND ativo = 1 LIMIT 1', [profissional_id]);
+        if (!prRows.length) return res.redirect(`${redirectTo}?error=Profissional%20inv%C3%A1lido`);
+        const profissionalNome = String(prRows[0].nome || '');
+
+        const [beforeRows] = await db.execute(
+            `SELECT id, paciente_id, paciente_nome, profissional_id, profissional_nome, data_hora, duracao_minutos,
+                    tipo_consulta, status, observacoes, valor, forma_pagamento, status_pagamento, convenio,
+                    enviar_lembrete, confirmar_whatsapp
+               FROM agendamentos
+              WHERE id = ?
+              LIMIT 1`,
+            [id]
+        );
+        if (!beforeRows.length) return res.redirect(`${redirectTo}?error=Agendamento%20n%C3%A3o%20encontrado`);
+
+        await db.execute(
+            `UPDATE agendamentos
+                SET paciente_id = ?, paciente_nome = ?, paciente_cpf = ?,
+                    profissional_id = ?, profissional_nome = ?,
+                    data_hora = ?, duracao_minutos = ?, tipo_consulta = ?,
+                    status = ?, observacoes = ?,
+                    valor = ?, forma_pagamento = ?, status_pagamento = ?, convenio = ?,
+                    enviar_lembrete = ?, confirmar_whatsapp = ?
+              WHERE id = ?`,
+            [
+                paciente_id, pacienteNome, pacienteCpf,
+                profissional_id, profissionalNome,
+                dt, duracao_minutos, tipo_consulta,
+                statusFinal, observacoes,
+                (valor != null && Number.isFinite(valor)) ? valor : null,
+                forma_pagamento,
+                statusPagFinal,
+                convenio,
+                enviar_lembrete,
+                confirmar_whatsapp,
+                id
+            ]
+        );
+
+        if (statusPagFinal === 'pago') {
+            await syncFinanceiroFromAgendamento(db, {
+                id,
+                paciente_id,
+                paciente_nome: pacienteNome,
+                data_hora: dt,
+                tipo_consulta,
+                valor,
+                status_pagamento: statusPagFinal,
+                forma_pagamento
+            });
+        }
+
+        return res.redirect(`${redirectTo}?success=Agendamento%20atualizado`);
+    } catch (error) {
+        console.error('Erro ao editar agendamento:', error);
+        return res.redirect('/agenda?error=Erro%20ao%20editar%20agendamento');
+    }
+});
+
 // LEMBRETES
-app.get('/lembretes', requireAuth, async (req, res) => {
+app.get('/lembretes', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const [lembretes] = await db.execute(
@@ -2575,7 +5438,7 @@ app.get('/lembretes', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/lembretes/novo', requireAuth, async (req, res) => {
+app.get('/lembretes/novo', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const [pacientes] = await db.execute(
@@ -2600,7 +5463,7 @@ app.get('/lembretes/novo', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/lembretes', requireAuth, async (req, res) => {
+app.post('/lembretes', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const {
             paciente_id,
@@ -2686,7 +5549,7 @@ app.post('/lembretes', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/lembretes/:id/editar', requireAuth, async (req, res) => {
+app.get('/lembretes/:id/editar', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const id = Number(req.params.id);
@@ -2720,7 +5583,7 @@ app.get('/lembretes/:id/editar', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/lembretes/:id/editar', requireAuth, async (req, res) => {
+app.post('/lembretes/:id/editar', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const id = Number(req.params.id);
@@ -2790,7 +5653,7 @@ app.post('/lembretes/:id/editar', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/lembretes/:id', requireAuth, async (req, res) => {
+app.get('/api/lembretes/:id', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const id = Number(req.params.id);
@@ -2817,7 +5680,7 @@ app.get('/api/lembretes/:id', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/lembretes/:id/enviar', requireAuth, async (req, res) => {
+app.post('/lembretes/:id/enviar', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const retryMinutes = Number(process.env.REMINDER_RETRY_INTERVAL_MINUTES || 5);
@@ -2892,7 +5755,7 @@ app.post('/lembretes/:id/enviar', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/lembretes/:id/excluir', requireAuth, async (req, res) => {
+app.post('/lembretes/:id/excluir', requireAuth, requireRoles(['admin', 'medico', 'secretaria']), async (req, res) => {
     try {
         const db = getDB();
         const id = Number(req.params.id);
@@ -2908,11 +5771,65 @@ app.post('/lembretes/:id/excluir', requireAuth, async (req, res) => {
     }
 });
 
+// Middleware de validação e tratamento de erros
+app.use((err, req, res, next) => {
+    console.error('Erro global:', err);
+    
+    // Erros de validação
+    if (err && err.name === 'ValidationError') {
+        return res.status(400).json({
+            success: false,
+            message: 'Dados inválidos',
+            errors: err.details
+        });
+    }
+    
+    // Erros de banco de dados
+    if (err && err.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({
+            success: false,
+            message: 'Registro já existe'
+        });
+    }
+    
+    // Erro padrão
+    res.status((err && err.status) || 500).json({
+        success: false,
+        message: (err && err.message) ? err.message : 'Erro interno do servidor'
+    });
+});
+
 // Inicialização do servidor
 async function startServer() {
     try {
         // Inicializar banco de dados
         await initDB();
+
+        // Tabela para recuperação de senha
+        try {
+            const db = getDB();
+            await ensureAccessControlTables(db);
+            await db.execute(`
+                CREATE TABLE IF NOT EXISTS password_resets (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    email VARCHAR(191) NOT NULL,
+                    token_hash CHAR(64) NOT NULL,
+                    code_hash VARCHAR(255) NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    used_at DATETIME NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    ip_address VARCHAR(64) NULL,
+                    user_agent VARCHAR(255) NULL,
+                    INDEX idx_pr_user (user_id),
+                    INDEX idx_pr_email (email),
+                    INDEX idx_pr_token (token_hash),
+                    INDEX idx_pr_expires (expires_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            `);
+        } catch (e) {
+            console.error('Erro ao garantir tabela password_resets:', e);
+        }
 
         // Garantir tabela de agendamentos (MVP)
         try {
@@ -2984,6 +5901,26 @@ async function startServer() {
 
             await ensureColumn("ALTER TABLE lembretes ADD COLUMN tentativas INT NOT NULL DEFAULT 0");
             await ensureColumn("ALTER TABLE lembretes ADD COLUMN ultimo_erro VARCHAR(255) NULL");
+
+            try {
+                const [tipoRows] = await db.execute(
+                    `SELECT DATA_TYPE, COLUMN_TYPE
+                     FROM information_schema.columns
+                     WHERE table_schema = DATABASE()
+                       AND table_name = 'lembretes'
+                       AND column_name = 'tipo'
+                     LIMIT 1`
+                );
+
+                const tipoRow = (tipoRows && tipoRows[0]) ? tipoRows[0] : null;
+                const columnType = tipoRow && tipoRow.COLUMN_TYPE ? String(tipoRow.COLUMN_TYPE) : '';
+
+                if (!columnType.toLowerCase().includes('aniversario')) {
+                    await ensureColumn("ALTER TABLE lembretes MODIFY COLUMN tipo ENUM('consulta','medicamento','exame','pagamento','outro','aniversario') DEFAULT NULL");
+                }
+            } catch (e) {
+                console.error('Erro ao garantir tipo de lembretes (aniversario):', e);
+            }
 
             try {
                 const db = getDB();
@@ -3143,34 +6080,60 @@ async function startServer() {
             console.error('Erro ao garantir tabela agendamentos:', tableError);
         }
 
-        // Iniciar servidor após inicializar o banco
-        app.listen(PORT, () => {
-            console.log(`Servidor rodando na porta ${PORT}`);
-            console.log(`Acesse: http://localhost:${PORT}`);
-            console.log('Serviço de WhatsApp Web iniciando...');
+        // ===============================
+// CONFIGURAÇÃO DE HOST E PORTA
+// ===============================
+const HOST = '0.0.0.0';
+const PORT = process.env.PORT || 3000;
 
-            if (!reminderCronStarted) {
-                reminderCronStarted = true;
-                cron.schedule('* * * * *', () => {
-                    processarLembretesPendentes();
-                });
-            }
+// ===============================
+// INICIAR SERVIDOR
+// ===============================
+app.listen(PORT, HOST, () => {
+    console.log('======================================');
+    console.log(`🚀 Servidor rodando`);
+    console.log(`🌐 Local:   http://localhost:${PORT}`);
+    console.log(`🌐 Externo: http://SEU_IP_PUBLICO:${PORT}`);
+    console.log('WhatsApp: inicialização manual pelo painel (/whatsapp)');
+    console.log('======================================');
 
-            if (process.env.WHATSAPP_AUTO_START === '1') {
-                setTimeout(() => {
-                    whatsappService.start().catch((e) => {
-                        console.error('Erro ao iniciar WhatsApp automaticamente:', e);
-                    });
-                }, 2000);
+    // ===============================
+    // CRON DE LEMBRETES
+    // ===============================
+    if (!reminderCronStarted) {
+        reminderCronStarted = true;
+
+        cron.schedule('* * * * *', async () => {
+            try {
+                await processarLembretesPendentes();
+            } catch (err) {
+                console.error('Erro ao processar lembretes:', err);
             }
-            
-            // Iniciar sistema de envio de lembretes após o servidor estar pronto
-            setTimeout(() => {
-                console.log('🚀 Iniciando sistema de envio de lembretes...');
-                // const agendaService = require('./agendaService');
-                // agendaService.iniciarEnvioLembretes();
-            }, 5000);
         });
+
+        cron.schedule('5 7 * * *', async () => {
+            try {
+                await criarLembretesAniversarioInternos();
+            } catch (err) {
+                console.error('Erro ao criar lembretes de aniversário:', err);
+            }
+        });
+    }
+
+    // ===============================
+    // SERVIÇOS APÓS START
+    // ===============================
+    setTimeout(() => {
+        console.log('🚀 Iniciando sistema de envio de lembretes...');
+        // const agendaService = require('./agendaService');
+        // agendaService.iniciarEnvioLembretes();
+    }, 5000);
+
+    setTimeout(() => {
+        void criarLembretesAniversarioInternos();
+    }, 7000);
+});
+
     } catch (error) {
         console.error('Erro ao iniciar servidor:', error);
     }

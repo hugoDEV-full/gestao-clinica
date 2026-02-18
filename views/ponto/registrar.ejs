@@ -1,0 +1,154 @@
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header text-center">
+                    <h4 class="mb-0"><i class="bi bi-clock"></i> Marcar Ponto</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info" role="alert">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-info-circle"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">Escolha o tipo de ponto</div>
+                                <div>
+                                    Use <strong>Entrada</strong> quando começar o turno.
+                                    Use <strong>Saída</strong> quando finalizar o turno.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <% if (colaborador) { %>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <% if (colaborador.foto_url) { %>
+                                <img src="<%= colaborador.foto_url %>" class="rounded-circle" style="width:64px; height:64px; object-fit:cover;" alt="Foto">
+                            <% } else { %>
+                                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:64px; height:64px; font-size:24px;">
+                                    <%= (colaborador.nome || 'C').toString().trim().slice(0,1).toUpperCase() %>
+                                </div>
+                            <% } %>
+                            <div>
+                                <div class="fw-bold"><%= colaborador.nome || 'Colaborador' %></div>
+                                <div class="small text-muted">CPF: <%= colaborador.cpf || '-' %></div>
+                                <div class="small text-muted"><%= colaborador.empresa || '-' %> • <%= colaborador.cargo || '-' %></div>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-success btn-lg" id="btnEntrada">
+                            <i class="bi bi-box-arrow-in-right"></i> Entrada
+                        </button>
+                        <button type="button" class="btn btn-outline-success btn-lg" id="btnSaida">
+                            <i class="bi bi-box-arrow-right"></i> Saída
+                        </button>
+                        <a class="btn btn-outline-secondary" href="/qr/<%= encodeURIComponent(token || '') %>">
+                            Voltar
+                        </a>
+                    </div>
+
+                    <div class="mt-3" id="pontoMsg"></div>
+                </div>
+                <div class="card-footer text-center text-muted small">
+                    Atualizado em <%= moment().format('DD/MM/YYYY HH:mm:ss') %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const token = "<%= (token || '').toString().replace(/\\/g, '\\\\').replace(/\"/g, '\\\"') %>";
+    const msgEl = document.getElementById('pontoMsg');
+
+    const DEVICE_ID_KEY = 'pontoDeviceId';
+    const DEVICE_ID_TS_KEY = 'pontoDeviceIdAt';
+    const DEVICE_ID_TTL_DAYS = Number('<%= (appConfig && appConfig.ACCESS_DEVICE_ID_TTL_DAYS) ? appConfig.ACCESS_DEVICE_ID_TTL_DAYS : 180 %>') || 180;
+
+    function setMsg(type, text) {
+        if (!msgEl) return;
+        const map = { success: 'success', danger: 'danger', warning: 'warning', info: 'info' };
+        msgEl.className = `alert alert-${map[type] || 'info'}`;
+        msgEl.textContent = text;
+    }
+
+    function getDeviceId() {
+        try {
+            const stored = window.localStorage ? window.localStorage.getItem(DEVICE_ID_KEY) : null;
+            const storedAt = window.localStorage ? Number(window.localStorage.getItem(DEVICE_ID_TS_KEY) || 0) : 0;
+            if (stored && storedAt) {
+                const ageDays = (Date.now() - storedAt) / (1000 * 60 * 60 * 24);
+                if (ageDays <= DEVICE_ID_TTL_DAYS) return stored;
+            }
+        } catch {}
+
+        let generated = '';
+        try {
+            generated = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : '';
+        } catch {}
+        if (!generated) {
+            generated = `dev-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+        }
+
+        try {
+            if (window.localStorage) {
+                window.localStorage.setItem(DEVICE_ID_KEY, generated);
+                window.localStorage.setItem(DEVICE_ID_TS_KEY, String(Date.now()));
+            }
+        } catch {}
+        return generated;
+    }
+
+    async function readGeo() {
+        return await new Promise((resolve) => {
+            try {
+                if (!navigator.geolocation) return resolve({});
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve({ geoLat: pos.coords.latitude, geoLng: pos.coords.longitude }),
+                    () => resolve({}),
+                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                );
+            } catch {
+                resolve({});
+            }
+        });
+    }
+
+    async function registrar(tipo) {
+        try {
+            setMsg('info', 'Registrando...');
+            const deviceId = getDeviceId();
+            const geo = await readGeo();
+            const payload = {
+                token,
+                tipo,
+                deviceId,
+                geoLat: geo.geoLat,
+                geoLng: geo.geoLng,
+                ssid: null,
+                local: null
+            };
+
+            const resp = await fetch('/api/ponto/registrar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data.success) {
+                throw new Error(data.message || 'Erro ao registrar ponto');
+            }
+            setMsg('success', `Ponto (${tipo}) registrado com sucesso.`);
+        } catch (e) {
+            setMsg('danger', e.message || 'Erro ao registrar ponto');
+        }
+    }
+
+    const btnEntrada = document.getElementById('btnEntrada');
+    const btnSaida = document.getElementById('btnSaida');
+    if (btnEntrada) btnEntrada.addEventListener('click', () => registrar('entrada'));
+    if (btnSaida) btnSaida.addEventListener('click', () => registrar('saida'));
+})();
+</script>

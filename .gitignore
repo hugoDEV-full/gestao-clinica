@@ -4,6 +4,9 @@
 # Backup folder
 backup/
 
+# Generated backups (not required to run)
+generated_backups/
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -97,6 +100,9 @@ logs
 # IDE files
 .vscode/
 .idea/
+
+# Windsurf editor artifacts
+.windsurf/
 *.swp
 *.swo
 *~

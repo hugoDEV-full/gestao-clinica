@@ -1,0 +1,225 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1"><i class="bi bi-journal-text"></i> Relatório de Funcionalidades</h3>
+        <div class="text-muted">Resumo didático do que foi implementado no sistema</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="mb-3">Visão geral</h5>
+        <p>
+            Este sistema é uma plataforma de gestão de clínica com módulos reais (sem botões falsos),
+            organizada por perfis de acesso (admin, médico, secretária e paciente). Abaixo explico,
+            em linguagem simples, as funcionalidades principais e as melhorias recentes.
+        </p>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">1) Navegação e perfis</h5>
+        <ul>
+            <li><strong>Admin</strong>: acesso total (configurações, usuários, permissões, auditoria, financeiro, acessos/QR).</li>
+            <li><strong>Médico</strong>: acesso à área médica (pacientes, prontuários, agenda, agendamentos).</li>
+            <li><strong>Secretária</strong>: acesso a agenda, agendamentos e lembretes.</li>
+            <li><strong>Paciente</strong>: acesso apenas às áreas permitidas.</li>
+        </ul>
+        <p class="text-muted mb-0">O sistema bloqueia páginas que não pertencem ao perfil do usuário.</p>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">2) Agenda e agendamentos</h5>
+        <ul>
+            <li><strong>Agendamentos</strong> com cadastro real (paciente, profissional, data, status).</li>
+            <li><strong>Agenda</strong> com filtros por dia, profissional e status.</li>
+            <li><strong>Lembretes</strong> com envio e controle de status (pendente/enviado/erro).</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">3) Pacientes e prontuários</h5>
+        <ul>
+            <li><strong>Pacientes</strong>: cadastro, edição e inativação (histórico preservado).</li>
+            <li><strong>Prontuários</strong>: consulta, impressão e evoluções (área médica).</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">4) Profissionais (real)</h5>
+        <ul>
+            <li>Cadastro real com CPF, especialidade, registro profissional.</li>
+            <li>Editar e inativar/ativar profissionais.</li>
+            <li>Busca por nome, CPF e outros campos.</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">5) Controle de acesso e ponto (QR)</h5>
+        <div class="alert alert-warning" role="alert">
+            <div class="fw-semibold">Diferença importante</div>
+            <div>
+                <strong>Controle de acesso</strong> é para <strong>liberar/negar a entrada</strong> no local.
+                <strong>Controle de ponto</strong> é para <strong>registrar a jornada</strong> (entrada/saída).
+                Os dois podem usar o mesmo QR, mas têm objetivos diferentes.
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="border rounded p-3 bg-light">
+                    <div class="fw-semibold mb-2"><i class="bi bi-door-open"></i> Fluxo: Controle de Acesso</div>
+                    <ol class="mb-0">
+                        <li>Admin cadastra colaborador e define status.</li>
+                        <li>Admin gera QR (fixo/dinâmico).</li>
+                        <li>Portaria escaneia o QR na entrada.</li>
+                        <li>Sistema valida e mostra: Autorizado/Restrito/Negado.</li>
+                        <li>Registro fica em Acessos (QR).</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="border rounded p-3 bg-light">
+                    <div class="fw-semibold mb-2"><i class="bi bi-clock"></i> Fluxo: Controle de Ponto</div>
+                    <ol class="mb-0">
+                        <li>Admin configura regras (whitelist/geo/SSID/anti-duplicidade).</li>
+                        <li>Colaborador escaneia o QR no início do turno.</li>
+                        <li>Sistema valida regras e registra Ponto - Entrada.</li>
+                        <li>No fim do turno, repete para registrar Ponto - Saída.</li>
+                        <li>Histórico fica em Acessos (QR) e no detalhe do colaborador.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <p class="mb-2">O sistema de QR foi reforçado com segurança real:</p>
+        <ul>
+            <li><strong>QR Fixo (crachá)</strong> ou <strong>QR Dinâmico</strong> (expira) configurável.</li>
+            <li><strong>Assinatura HMAC</strong> para impedir fraude do token.</li>
+            <li><strong>Single-use</strong> no QR dinâmico (não reutiliza).</li>
+            <li><strong>Whitelist de devices</strong>: só aparelhos cadastrados podem registrar ponto.</li>
+            <li><strong>Device ID</strong> exibido e copiável no perfil do colaborador.</li>
+            <li><strong>Geolocalização e SSID</strong> opcionais para travar ponto no local.</li>
+            <li><strong>Rate limit</strong> contra abuso (IP+device e por colaborador).</li>
+        </ul>
+        <p class="text-muted mb-0">
+            Resultado: o QR serve tanto para liberar acesso quanto para registrar ponto com segurança.
+        </p>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">6) Configurações (admin)</h5>
+        <ul>
+            <li>Aba <strong>Acesso/QR</strong> com todos os parâmetros de segurança e tooltips explicativos.</li>
+            <li>Configurações de WhatsApp, lembretes, agenda e backup.</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">7) WhatsApp</h5>
+        <ul>
+            <li>Painel de status real com QR de conexão.</li>
+            <li>Ações de iniciar, reativar e testes.</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">8) Auditoria (LGPD)</h5>
+        <ul>
+            <li>Log de operações relevantes (quem fez o quê e quando).</li>
+            <li>Filtros por usuário, ação e tabela.</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">9) Itens removidos (evitar “mentirinha”)</h5>
+        <ul>
+            <li>Foram removidos módulos/menus sem base real (ex.: convênios e outros placeholders).</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">Como usar (passo a passo simples)</h5>
+        <ol>
+            <li>Configure o modo do QR em <strong>Configurações &gt; Acesso/QR</strong>.</li>
+            <li>Cadastre colaboradores e gere o QR na tela de colaboradores.</li>
+            <li>Cadastre os devices autorizados no detalhe do colaborador.</li>
+            <li>Para ponto, escaneie o QR e registre (com geo/SSID se ativado).</li>
+            <li>Monitore tudo em <strong>Acessos (QR)</strong>.</li>
+        </ol>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">Checklist final (teste rápido por módulo)</h5>
+        <p class="text-muted">Sugestão: faça este checklist após subir o sistema (local ou ngrok) para garantir que está tudo “de verdade”.</p>
+
+        <h6 class="mb-2">A) Login e perfis</h6>
+        <ul>
+            <li>Entrar com usuário <strong>admin</strong> e confirmar que o menu mostra: Configurações, Usuários, Colaboradores, Acessos, Auditoria.</li>
+            <li>Entrar com <strong>médico</strong> e confirmar que <strong>não</strong> aparece Configurações.</li>
+            <li>Entrar com <strong>secretária</strong> e confirmar que aparece apenas Agenda / Agendamentos / Lembretes.</li>
+        </ul>
+
+        <h6 class="mb-2">B) Agenda / Agendamentos</h6>
+        <ul>
+            <li>Abrir <code>/agendamentos</code>, criar um agendamento e verificar se aparece na lista.</li>
+            <li>Abrir <code>/agenda</code>, filtrar por data e confirmar que o agendamento aparece.</li>
+        </ul>
+
+        <h6 class="mb-2">C) Pacientes / Prontuários (médico/admin)</h6>
+        <ul>
+            <li>Abrir <code>/pacientes</code>, criar um paciente e confirmar que aparece na listagem.</li>
+            <li>Abrir um prontuário e testar salvar/editar (quando disponível no perfil).</li>
+        </ul>
+
+        <h6 class="mb-2">D) Profissionais</h6>
+        <ul>
+            <li>Abrir <code>/profissionais</code>, clicar em Novo, salvar e confirmar na tabela.</li>
+            <li>Editar um profissional e confirmar alteração.</li>
+            <li>Inativar/ativar e conferir badge/estado.</li>
+        </ul>
+
+        <h6 class="mb-2">E) Controle de acesso e ponto (QR)</h6>
+        <ol>
+            <li>Ir em <strong>Configurações &gt; Acesso/QR</strong> e escolher <strong>Modo do QR</strong>:
+                <ul>
+                    <li><strong>QR fixo</strong>: melhor para crachá impresso.</li>
+                    <li><strong>QR dinâmico</strong>: melhor para gerar na hora.</li>
+                </ul>
+            </li>
+            <li>Abrir <code>/colaboradores</code> e gerar o QR de um colaborador.</li>
+            <li>Abrir o link <code>/qr/&lt;token&gt;</code> (pelo QR) e verificar se mostra autorizado/restrito/negado conforme status.</li>
+            <li>Se <strong>Whitelist por device</strong> estiver ativa:
+                <ul>
+                    <li>Abra o detalhe do colaborador (<code>/colaboradores/:id</code>).</li>
+                    <li>Copie o <strong>Device atual</strong> e cadastre em <strong>Devices autorizados</strong>.</li>
+                    <li>Teste o registro de ponto novamente.</li>
+                </ul>
+            </li>
+            <li>Testar registro de ponto:
+                <ul>
+                    <li>Registrar <strong>entrada</strong> e depois <strong>saída</strong>.</li>
+                    <li>Tentar repetir o mesmo tipo dentro da janela e confirmar bloqueio (anti-duplicidade).</li>
+                </ul>
+            </li>
+            <li>Conferir em <code>/acessos</code> se os eventos foram logados (tipo <code>ponto</code> e validação do QR).</li>
+        </ol>
+
+        <h6 class="mb-2">F) Auditoria (admin)</h6>
+        <ul>
+            <li>Abrir <code>/auditoria</code> e filtrar por <code>acao</code> e <code>tabela</code>.</li>
+        </ul>
+
+        <h6 class="mb-2">G) WhatsApp (admin)</h6>
+        <ul>
+            <li>Abrir <code>/whatsapp</code> e validar status / QR de conexão (quando disponível).</li>
+        </ul>
+
+        <hr class="my-4">
+
+        <h5 class="mb-3">Dicas práticas (para leigos)</h5>
+        <ul class="mb-0">
+            <li><strong>Se algo não funciona ao clicar</strong>: pressione Ctrl+F5 e teste novamente.</li>
+            <li><strong>Se der “acesso negado”</strong>: verifique se está logado com o perfil correto.</li>
+            <li><strong>Para o ponto ficar seguro</strong>: habilite whitelist + (opcional) geolocalização/SSID.</li>
+        </ul>
+    </div>
+</div>

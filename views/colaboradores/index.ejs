@@ -1,0 +1,392 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-person-badge"></i> Colaboradores</h3>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalColaborador" title="Cadastrar novo colaborador">
+        <i class="bi bi-plus-circle"></i> Novo Colaborador
+    </button>
+</div>
+
+<% const lista = Array.isArray(colaboradores) ? colaboradores : []; %>
+
+<div id="colaboradoresAlert" class="alert d-none" role="alert"></div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0"><i class="bi bi-list-ul"></i> Colaboradores Cadastrados</h5>
+        <div class="input-group" style="max-width: 320px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" placeholder="Buscar colaborador..." id="buscaColaborador">
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="colaboradoresTable">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>Empresa</th>
+                        <th>Cargo</th>
+                        <th>Status</th>
+                        <th>QR</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (lista.length === 0) { %>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">Nenhum colaborador encontrado.</td>
+                    </tr>
+                    <% } %>
+                    <% lista.forEach((c) => { %>
+                    <tr data-colaborador-nome="<%= (c.nome || '').toString().toLowerCase() %>"
+                        data-id="<%= c.id %>"
+                        data-nome="<%= (c.nome || '').toString() %>"
+                        data-cpf="<%= (c.cpf || '').toString() %>"
+                        data-empresa="<%= (c.empresa || '').toString() %>"
+                        data-cargo="<%= (c.cargo || '').toString() %>"
+                        data-status="<%= (c.status || '').toString() %>">
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                    <%= (c.nome || 'C').toString().trim().slice(0, 1).toUpperCase() %>
+                                </div>
+                                <div>
+                                    <div class="fw-bold"><%= c.nome %></div>
+                                    <small class="text-muted"><%= c.created_at ? moment(c.created_at).format('DD/MM/YYYY') : '-' %></small>
+                                </div>
+                            </div>
+                        </td>
+                        <td><%= c.cpf || '-' %></td>
+                        <td><%= c.empresa || '-' %></td>
+                        <td><%= c.cargo || '-' %></td>
+                        <td>
+                            <% const st = (c.status || '').toString(); %>
+                            <% if (st === 'ativo') { %>
+                                <span class="badge bg-success">Ativo</span>
+                            <% } else if (st === 'inativo') { %>
+                                <span class="badge bg-warning text-dark">Inativo</span>
+                            <% } else { %>
+                                <span class="badge bg-danger">Bloqueado</span>
+                            <% } %>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="gerarQrToken('<%= c.id %>')" title="Gerar QR dinâmico" data-bs-toggle="tooltip">
+                                <i class="bi bi-qr-code"></i>
+                            </button>
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a class="btn btn-sm btn-outline-primary" href="/colaboradores/<%= c.id %>" title="Ver detalhes" data-bs-toggle="tooltip">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="abrirEdicao('<%= c.id %>')" title="Editar colaborador" data-bs-toggle="tooltip">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-success" onclick="alterarStatus('<%= c.id %>', 'ativo')" title="Ativar colaborador" data-bs-toggle="tooltip">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-warning" onclick="alterarStatus('<%= c.id %>', 'inativo')" title="Inativar colaborador" data-bs-toggle="tooltip">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="alterarStatus('<%= c.id %>', 'bloqueado')" title="Bloquear colaborador" data-bs-toggle="tooltip">
+                                    <i class="bi bi-slash-circle"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalColaborador" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cadastrar Colaborador</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formColaborador">
+                    <input type="hidden" name="id" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome Completo *</label>
+                            <input type="text" class="form-control" name="nome" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CPF *</label>
+                            <input type="text" class="form-control" name="cpf" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Empresa/Local</label>
+                            <input type="text" class="form-control" name="empresa">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Cargo/Função</label>
+                            <input type="text" class="form-control" name="cargo">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="ativo">Ativo</option>
+                                <option value="inativo">Inativo</option>
+                                <option value="bloqueado">Bloqueado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Foto</label>
+                            <input type="file" class="form-control" name="foto" accept="image/*">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" title="Cancelar" data-bs-toggle="tooltip">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarColaborador" title="Salvar colaborador" data-bs-toggle="tooltip">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalQr" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrModalTitle">QR Code</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <div class="mb-2 text-muted" id="qrModalSubtitle">Token válido por tempo limitado</div>
+                    <div class="fw-bold" id="qrTokenValue">-</div>
+                    <div class="small text-muted" id="qrTokenExpires">-</div>
+                </div>
+                <div class="d-flex justify-content-center mt-3">
+                    <div id="qrTokenCanvas" class="border rounded p-2 bg-white"></div>
+                </div>
+                <div class="alert alert-info mt-3" id="qrTokenUrl">-</div>
+                <div class="d-flex justify-content-center">
+                    <button type="button" class="btn btn-outline-secondary" id="btnPrintQr" title="Imprimir QR" data-bs-toggle="tooltip">
+                        <i class="bi bi-printer"></i> Imprimir QR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const DEVICE_ID_KEY = 'pontoDeviceId';
+    const DEVICE_ID_TS_KEY = 'pontoDeviceIdAt';
+    const DEVICE_ID_TTL_DAYS = Number('<%= (appConfig && appConfig.ACCESS_DEVICE_ID_TTL_DAYS) ? appConfig.ACCESS_DEVICE_ID_TTL_DAYS : 180 %>') || 180;
+    function getDeviceId() {
+        try {
+            const stored = window.localStorage ? window.localStorage.getItem(DEVICE_ID_KEY) : null;
+            const storedAt = window.localStorage ? Number(window.localStorage.getItem(DEVICE_ID_TS_KEY) || 0) : 0;
+            if (stored && storedAt) {
+                const ageDays = (Date.now() - storedAt) / (1000 * 60 * 60 * 24);
+                if (ageDays <= DEVICE_ID_TTL_DAYS) return stored;
+            }
+        } catch {}
+
+        let generated = '';
+        try {
+            generated = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : '';
+        } catch {}
+        if (!generated) {
+            generated = `dev-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+        }
+
+        try {
+            if (window.localStorage) {
+                window.localStorage.setItem(DEVICE_ID_KEY, generated);
+                window.localStorage.setItem(DEVICE_ID_TS_KEY, String(Date.now()));
+            }
+        } catch {}
+        return generated;
+    }
+
+    const deviceId = getDeviceId();
+    const alertBox = document.getElementById('colaboradoresAlert');
+    const form = document.getElementById('formColaborador');
+    const btnSalvar = document.getElementById('btnSalvarColaborador');
+    const modalEl = document.getElementById('modalColaborador');
+    const modalQrEl = document.getElementById('modalQr');
+    const modalQrTitle = document.getElementById('qrModalTitle');
+    const modalQrSubtitle = document.getElementById('qrModalSubtitle');
+    const tokenValueEl = document.getElementById('qrTokenValue');
+    const tokenExpiresEl = document.getElementById('qrTokenExpires');
+    const buscaEl = document.getElementById('buscaColaborador');
+    const tokenUrlEl = document.getElementById('qrTokenUrl');
+    const tokenCanvasEl = document.getElementById('qrTokenCanvas');
+    const btnPrintQr = document.getElementById('btnPrintQr');
+    const QR_BASE_URL = 'https://overdeliciously-opsonic-lemuel.ngrok-free.dev';
+    let lastQrUrl = '';
+
+    function showAlert(type, msg) {
+        if (!alertBox) return;
+        const map = {
+            success: { klass: 'success', icon: 'bi-check-circle', label: 'Sucesso' },
+            danger: { klass: 'danger', icon: 'bi-exclamation-triangle', label: 'Erro' },
+            warning: { klass: 'warning', icon: 'bi-exclamation-circle', label: 'Atenção' },
+            info: { klass: 'info', icon: 'bi-info-circle', label: 'Informação' }
+        };
+        const m = map[type] || map.danger;
+        alertBox.className = `alert alert-${m.klass} alert-dismissible fade show`;
+        alertBox.innerHTML = `
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi ${m.icon}"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold">${m.label}</div>
+                    <div>${String(msg || '').replace(/</g, '&lt;')}</div>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        alertBox.classList.remove('d-none');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    window.abrirEdicao = function (id) {
+        const row = document.querySelector(`tr[data-colaborador-nome][data-id="${id}"]`);
+        if (!form || !row) return;
+        form.reset();
+        form.elements.id.value = id;
+        form.elements.nome.value = row.dataset.nome || '';
+        form.elements.cpf.value = row.dataset.cpf || '';
+        form.elements.empresa.value = row.dataset.empresa || '';
+        form.elements.cargo.value = row.dataset.cargo || '';
+        form.elements.status.value = row.dataset.status || 'ativo';
+        const modal = window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
+        if (modal) modal.show();
+    };
+
+    window.alterarStatus = async function (id, status) {
+        try {
+            const resp = await fetch(`/api/colaboradores/${id}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ status })
+            });
+            const json = await resp.json().catch(() => ({}));
+            if (!resp.ok || !json.success) throw new Error(json.message || 'Erro ao atualizar status');
+            showAlert('success', 'Status atualizado com sucesso.');
+            setTimeout(() => window.location.reload(), 400);
+        } catch (e) {
+            showAlert('danger', e.message || 'Erro ao atualizar status');
+        }
+    };
+
+    window.gerarQrToken = async function (id) {
+        try {
+            const resp = await fetch(`/api/colaboradores/${id}/qr`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ deviceId })
+            });
+            const json = await resp.json().catch(() => ({}));
+            if (!resp.ok || !json.success) throw new Error(json.message || 'Erro ao gerar token');
+            const mode = (json.mode || '').toString().toLowerCase();
+            const isFixed = mode === 'fixed';
+            if (modalQrTitle) modalQrTitle.textContent = isFixed ? 'QR Code (Crachá)' : 'QR Code Dinâmico';
+            if (modalQrSubtitle) modalQrSubtitle.textContent = isFixed ? 'QR fixo do colaborador' : 'Token válido por tempo limitado';
+            if (tokenValueEl) tokenValueEl.textContent = json.token || '-';
+            if (tokenExpiresEl) tokenExpiresEl.textContent = json.expiresAt ? `Expira em ${json.expiresAt}` : (isFixed ? 'Sem expiração' : '-');
+            if (tokenUrlEl) {
+                const url = `${QR_BASE_URL}/qr/${json.token}`;
+                tokenUrlEl.textContent = `URL: ${url}`;
+            }
+            if (tokenCanvasEl) {
+                tokenCanvasEl.innerHTML = '';
+                const url = `${QR_BASE_URL}/qr/${json.token}`;
+                lastQrUrl = url;
+                if (window.QRCode) {
+                    new window.QRCode(tokenCanvasEl, {
+                        text: url,
+                        width: 160,
+                        height: 160,
+                        colorDark: '#111827',
+                        colorLight: '#ffffff'
+                    });
+                } else {
+                    tokenCanvasEl.textContent = 'QR indisponível';
+                }
+            }
+            const modal = window.bootstrap ? new window.bootstrap.Modal(modalQrEl) : null;
+            if (modal) modal.show();
+        } catch (e) {
+            showAlert('danger', e.message || 'Erro ao gerar token');
+        }
+    };
+
+    if (btnPrintQr) {
+        btnPrintQr.addEventListener('click', () => {
+            if (!tokenCanvasEl) return;
+            const img = tokenCanvasEl.querySelector('img')?.getAttribute('src');
+            if (!img) return showAlert('danger', 'Gere o QR antes de imprimir.');
+            const w = window.open('', '_blank');
+            if (!w) return;
+            w.document.write(`
+                <html>
+                <head><title>Imprimir QR</title></head>
+                <body style="display:flex;align-items:center;justify-content:center;height:100vh;">
+                    <div style="text-align:center;">
+                        <img src="${img}" style="width:220px;height:220px;" />
+                        <div style="margin-top:12px;font-family:Arial, sans-serif;">${lastQrUrl}</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            w.document.close();
+            w.focus();
+            w.print();
+        });
+    }
+
+    if (btnSalvar) {
+        btnSalvar.addEventListener('click', async () => {
+            if (!form) return;
+            const data = new FormData(form);
+            const id = data.get('id');
+            const nome = (data.get('nome') || '').toString().trim();
+            const cpf = (data.get('cpf') || '').toString().trim();
+            if (!nome || !cpf) return showAlert('danger', 'Nome e CPF são obrigatórios.');
+
+            btnSalvar.disabled = true;
+            try {
+                const resp = await fetch(id ? `/api/colaboradores/${id}` : '/api/colaboradores', {
+                    method: id ? 'PUT' : 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: data
+                });
+                const json = await resp.json().catch(() => ({}));
+                if (!resp.ok || !json.success) throw new Error(json.message || 'Erro ao salvar colaborador');
+                showAlert('success', 'Colaborador salvo com sucesso.');
+                form.reset();
+                const modal = window.bootstrap ? window.bootstrap.Modal.getInstance(modalEl) : null;
+                if (modal) modal.hide();
+                setTimeout(() => window.location.reload(), 500);
+            } catch (e) {
+                showAlert('danger', e.message || 'Erro ao salvar colaborador');
+            } finally {
+                btnSalvar.disabled = false;
+            }
+        });
+    }
+
+    if (buscaEl) {
+        buscaEl.addEventListener('input', () => {
+            const term = buscaEl.value.toLowerCase();
+            document.querySelectorAll('#colaboradoresTable tbody tr').forEach((row) => {
+                const nome = row.getAttribute('data-colaborador-nome') || '';
+                row.style.display = nome.includes(term) ? '' : 'none';
+            });
+        });
+    }
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
