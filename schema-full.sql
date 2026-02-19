@@ -3,8 +3,26 @@
 -- Reordered to avoid foreign key dependency issues
 SET FOREIGN_KEY_CHECKS=0;
 
--- Tables without foreign keys (base tables)
+-- Drop tables in reverse dependency order
+DROP TABLE IF EXISTS `prontuario_evolucoes`;
+DROP TABLE IF EXISTS `prontuarios`;
+DROP TABLE IF EXISTS `logs_lgpd`;
+DROP TABLE IF EXISTS `lembretes`;
+DROP TABLE IF EXISTS `financeiro`;
+DROP TABLE IF EXISTS `agendamentos`;
+DROP TABLE IF EXISTS `agenda`;
+DROP TABLE IF EXISTS `access_logs`;
+DROP TABLE IF EXISTS `access_tokens`;
+DROP TABLE IF EXISTS `ponto_logs`;
+DROP TABLE IF EXISTS `colaborador_devices`;
+DROP TABLE IF EXISTS `password_resets`;
+DROP TABLE IF EXISTS `colaboradores`;
+DROP TABLE IF EXISTS `profissionais`;
+DROP TABLE IF EXISTS `pacientes`;
+DROP TABLE IF EXISTS `usuarios`;
+DROP TABLE IF EXISTS `configuracoes`;
 DROP TABLE IF EXISTS `app_config`;
+
 CREATE TABLE `app_config` (
   `chave` varchar(64) NOT NULL,
   `valor` text,
@@ -12,7 +30,6 @@ CREATE TABLE `app_config` (
   PRIMARY KEY (`chave`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `configuracoes`;
 CREATE TABLE `configuracoes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `whatsapp_numero` varchar(20) DEFAULT '61982976481',
@@ -24,7 +41,6 @@ CREATE TABLE `configuracoes` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `usuarios`;
 CREATE TABLE `usuarios` (
   `id` int NOT NULL AUTO_INCREMENT,
   `nome` varchar(100) NOT NULL,
@@ -40,7 +56,6 @@ CREATE TABLE `usuarios` (
   UNIQUE KEY `cpf` (`cpf`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `pacientes`;
 CREATE TABLE `pacientes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `nome` varchar(100) NOT NULL,
@@ -67,7 +82,6 @@ CREATE TABLE `pacientes` (
   UNIQUE KEY `cpf` (`cpf`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `profissionais`;
 CREATE TABLE `profissionais` (
   `id` int NOT NULL AUTO_INCREMENT,
   `nome` varchar(100) NOT NULL,
@@ -83,7 +97,6 @@ CREATE TABLE `profissionais` (
   UNIQUE KEY `cpf` (`cpf`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `colaboradores`;
 CREATE TABLE `colaboradores` (
   `id` int NOT NULL AUTO_INCREMENT,
   `usuario_id` int DEFAULT NULL,
@@ -104,7 +117,6 @@ CREATE TABLE `colaboradores` (
   KEY `idx_colaborador_usuario` (`usuario_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `password_resets`;
 CREATE TABLE `password_resets` (
   `id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL,
@@ -123,7 +135,6 @@ CREATE TABLE `password_resets` (
   KEY `idx_pr_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `colaborador_devices`;
 CREATE TABLE `colaborador_devices` (
   `id` int NOT NULL AUTO_INCREMENT,
   `colaborador_id` int NOT NULL,
@@ -136,7 +147,6 @@ CREATE TABLE `colaborador_devices` (
   KEY `idx_colab_device` (`colaborador_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `access_tokens`;
 CREATE TABLE `access_tokens` (
   `id` int NOT NULL AUTO_INCREMENT,
   `colaborador_id` int NOT NULL,
@@ -151,7 +161,6 @@ CREATE TABLE `access_tokens` (
   KEY `idx_access_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `access_logs`;
 CREATE TABLE `access_logs` (
   `id` int NOT NULL AUTO_INCREMENT,
   `colaborador_id` int DEFAULT NULL,
@@ -168,7 +177,6 @@ CREATE TABLE `access_logs` (
   KEY `idx_access_log_tipo` (`tipo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `ponto_logs`;
 CREATE TABLE `ponto_logs` (
   `id` int NOT NULL AUTO_INCREMENT,
   `colaborador_id` int NOT NULL,
@@ -181,7 +189,6 @@ CREATE TABLE `ponto_logs` (
   KEY `idx_ponto_tipo` (`tipo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `agenda`;
 CREATE TABLE `agenda` (
   `id` int NOT NULL AUTO_INCREMENT,
   `paciente_id` int DEFAULT NULL,
@@ -201,7 +208,6 @@ CREATE TABLE `agenda` (
   KEY `profissional_id` (`profissional_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `agendamentos`;
 CREATE TABLE `agendamentos` (
   `id` int NOT NULL AUTO_INCREMENT,
   `paciente_id` int NOT NULL,
@@ -229,7 +235,6 @@ CREATE TABLE `agendamentos` (
   KEY `idx_profissional_id` (`profissional_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `financeiro`;
 CREATE TABLE `financeiro` (
   `id` int NOT NULL AUTO_INCREMENT,
   `tipo` enum('receita','despesa') NOT NULL,
@@ -255,7 +260,6 @@ CREATE TABLE `financeiro` (
   KEY `idx_financeiro_tipo` (`tipo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `lembretes`;
 CREATE TABLE `lembretes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `paciente_id` int DEFAULT NULL,
@@ -278,7 +282,6 @@ CREATE TABLE `lembretes` (
   KEY `fk_lembretes_agenda` (`agenda_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `prontuarios`;
 CREATE TABLE `prontuarios` (
   `id` int NOT NULL AUTO_INCREMENT,
   `paciente_id` int NOT NULL,
@@ -310,7 +313,6 @@ CREATE TABLE `prontuarios` (
   KEY `idx_prontuarios_data` (`data_atendimento`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `prontuario_evolucoes`;
 CREATE TABLE `prontuario_evolucoes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `prontuario_id` int NOT NULL,
@@ -323,7 +325,6 @@ CREATE TABLE `prontuario_evolucoes` (
   KEY `idx_pe_data` (`data_evolucao`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-DROP TABLE IF EXISTS `logs_lgpd`;
 CREATE TABLE `logs_lgpd` (
   `id` int NOT NULL AUTO_INCREMENT,
   `usuario_id` int DEFAULT NULL,
