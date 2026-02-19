@@ -78,9 +78,67 @@ async function setup() {
     console.log('✅ Schema importado com sucesso!');
     console.log('🎉 Banco de dados pronto para uso.');
     
+    // Criar usuário admin padrão se não existir
+    await createDefaultAdmin();
+    
   } catch (error) {
     console.error('❌ Erro no setup:', error.message);
     process.exit(1);
+  }
+}
+
+async function createDefaultAdmin() {
+  const bcrypt = require('bcrypt');
+  const mysql = require('mysql2/promise');
+  
+  // Configuração do banco com fallback Railway
+  const dbConfig = {
+    host: process.env.DB_HOST || process.env.RAILWAY_MYSQLHOST || 'localhost',
+    port: process.env.DB_PORT || process.env.RAILWAY_MYSQLPORT || 3306,
+    user: process.env.DB_USER || process.env.RAILWAY_MYSQLUSER || 'root',
+    password: process.env.DB_PASSWORD || process.env.RAILWAY_MYSQLPASSWORD || '',
+    database: process.env.DB_NAME || process.env.RAILWAY_MYSQLDATABASE || 'railway',
+    timezone: process.env.DB_TIMEZONE || '+00:00'
+  };
+  
+  const connection = await mysql.createConnection(dbConfig);
+  
+  try {
+    const email = 'hugo.leonardo.jobs@gmail.com';
+    const plainPassword = 'Bento1617@*';
+    const nome = 'Hugo Admin';
+    const tipo = 'admin';
+    
+    console.log('🔧 Verificando usuário admin padrão...');
+    
+    // Verificar se usuário já existe
+    const [existing] = await connection.execute(
+      'SELECT id FROM usuarios WHERE email = ?',
+      [email]
+    );
+    
+    if (existing.length > 0) {
+      console.log('✅ Usuário admin padrão já existe.');
+    } else {
+      // Hash da senha
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      
+      // Inserir usuário admin
+      await connection.execute(
+        `INSERT INTO usuarios (nome, email, senha, tipo, ativo) VALUES (?, ?, ?, ?, 1)`,
+        [nome, email, hashedPassword, tipo]
+      );
+      
+      console.log('👤 Usuário admin padrão criado com sucesso!');
+      console.log('📧 Email:', email);
+      console.log('🔑 Senha:', plainPassword);
+      console.log('👤 Tipo:', tipo);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao criar usuário admin:', error.message);
+  } finally {
+    await connection.end();
   }
 }
 
