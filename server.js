@@ -1576,6 +1576,7 @@ app.post('/login', authLimiter, async (req, res) => {
     }
 });
 
+/*
 // Rota pública de registro de usuário
 app.get('/register', (req, res) => {
     res.render('register', { 
@@ -1587,6 +1588,7 @@ app.get('/register', (req, res) => {
         telefone: ''
     });
 });
+*/
 
 // Processar registro de usuário
 app.post('/register', async (req, res) => {
