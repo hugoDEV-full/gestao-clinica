@@ -1395,36 +1395,52 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         const baseUrl = await getAppBaseUrlFromConfig(db, req);
         const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}` : '';
 
+        // Verificar se tem SMTP configurado
+        const transporter = await getMailerTransporterFromConfig(db);
+        
+        if (!transporter) {
+            // Sem email - mostrar código na tela
+            return res.render('forgot-password', {
+                error: null,
+                info: `Código de redefinição gerado! Anote: <strong>${code}</strong><br><small>Válido por ${ttlMinutes} minutos</small><br><br>Link: <a href="${resetLink}">${resetLink}</a>`,
+                usuario: user,
+                currentPage: ''
+            });
+        }
+
+        // Com email - enviar normalmente
         const cfgFrom = await getAppConfigValue(db, 'SMTP_FROM');
         const from = (cfgFrom != null && String(cfgFrom).trim())
             ? String(cfgFrom).trim()
             : (process.env.SMTP_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
-        const transporter = await getMailerTransporterFromConfig(db);
 
-        const subject = 'Código para redefinir sua senha';
-        const text =
-            `Olá, ${user.nome || 'usuário'}\n\n` +
-            `Seu código de verificação é: ${code}\n` +
-            `Ele expira em ${ttlMinutes} minutos.\n\n` +
-            (resetLink ? `Link para redefinir: ${resetLink}\n\n` : '') +
-            `Se você não solicitou, ignore este e-mail.`;
+        const subject = 'Redefinição de Senha - Clínica Andreia Ballejo';
+        const text = `Olá ${user.nome},\n\nRecebemos uma solicitação para redefinir sua senha.\n\nCódigo: ${code}\nLink: ${resetLink}\n\nEste código expira em ${ttlMinutes} minutos.\n\nSe não solicitou, ignore este email.`;
+        const html = `
+            <h2>Redefinição de Senha</h2>
+            <p>Olá <strong>${user.nome}</strong>,</p>
+            <p>Recebemos uma solicitação para redefinir sua senha.</p>
+            <p><strong>Código:</strong> <code style="font-size: 1.2em; background: #f0f0f0; padding: 5px;">${code}</code></p>
+            <p><a href="${resetLink}">Clique aqui para redefinir</a></p>
+            <p><small>Válido por ${ttlMinutes} minutos.</small></p>
+            <p><em>Se não solicitou, ignore este email.</em></p>
+        `;
 
-        if (transporter) {
-            await transporter.sendMail({
-                from,
-                to: user.email,
-                subject,
-                text
-            });
-        } else {
-            console.warn(`[${nowLabel()}] SMTP não configurado. Código de reset para ${user.email}: ${code}`);
-            if (resetLink) console.warn(`[${nowLabel()}] Link reset: ${resetLink}`);
-        }
+        await transporter.sendMail({
+            from,
+            to: user.email,
+            subject,
+            text,
+            html
+        });
 
         return res.render('forgot-password', {
             error: null,
-            info: `Código enviado para o seu e-mail. Você tem ${ttlMinutes} minutos para inserir o código e redefinir a senha.`
+            info: 'Email de redefinição enviado! Verifique sua caixa de entrada.',
+            usuario: user,
+            currentPage: ''
         });
+
     } catch (e) {
         console.error('Erro no forgot-password:', e);
         return res.render('forgot-password', { error: 'Não foi possível processar a solicitação agora. Tente novamente.', info: null });
