@@ -1662,7 +1662,6 @@ app.get('/register', (req, res) => {
         telefone: ''
     });
 });
-*/
 
 // Processar registro de usuário
 app.post('/register', async (req, res) => {
