@@ -1673,14 +1673,14 @@ app.post('/register', async (req, res) => {
         // Hash da senha
         const senhaHash = await bcrypt.hash(senha, 10);
         
-        // Inserir usuário com tipo 'secretaria' por padrão (não admin)
+        // Inserir usuário com tipo 'admin' por padrão
         await db.execute(
             `INSERT INTO usuarios (nome, email, senha, tipo, cpf, telefone, ativo) 
-             VALUES (?, ?, ?, 'secretaria', ?, ?, 1)`,
+             VALUES (?, ?, ?, 'admin', ?, ?, 1)`,
             [nomeTrim, emailTrim, senhaHash, cpfTrim || null, telefoneTrim || null]
         );
         
-        console.log(`[${nowLabel()}] NOVO USUÁRIO REGISTRADO: ${emailTrim} (${nomeTrim})`);
+        console.log(`[${nowLabel()}] NOVO USUÁRIO ADMIN REGISTRADO: ${emailTrim} (${nomeTrim})`);
         
         return res.render('register', { 
             error: null, 
