@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log*
+yarn.lock
+.DS_Store
+.git
+.gitignore
+generated_backups
+*.zip
+generated_backups/*.sql

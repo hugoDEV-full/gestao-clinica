@@ -11,7 +11,11 @@ class WhatsAppService {
         this.qrCode = null;
         this.isStarting = false;
         this._startAttempts = 0;
-        this.initializeClient();
+        const autoInitEnv = String(process.env.WHATSAPP_AUTO_INIT || '').toLowerCase();
+        const autoInit = !(autoInitEnv === '0' || autoInitEnv === 'false' || autoInitEnv === 'no');
+        if (autoInit) {
+            this.initializeClient();
+        }
     }
 
     isConnectedState(state) {
@@ -22,6 +26,21 @@ class WhatsAppService {
     resolveBrowserExecutablePath() {
         const envPath = process.env.WHATSAPP_CHROME_PATH;
         if (envPath && fs.existsSync(envPath)) return envPath;
+
+        // Linux/Railway common paths
+        const linuxCandidates = [
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable'
+        ];
+        for (const p of linuxCandidates) {
+            try {
+                if (fs.existsSync(p)) return p;
+            } catch (e) {
+                // ignore
+            }
+        }
 
         const candidates = [
             // Chrome
@@ -43,10 +62,22 @@ class WhatsAppService {
         const headlessEnv = process.env.WHATSAPP_HEADLESS;
         const headless = headlessEnv === '0' ? false : (headlessEnv === 'new' ? 'new' : true);
 
+        const authPath = (process.env.WHATSAPP_AUTH_PATH || '').toString().trim();
+        const authStrategyOptions = {
+            clientId: 'clinica-andreia-ballejo'
+        };
+        if (authPath) {
+            authStrategyOptions.dataPath = authPath;
+        }
+
+        console.log('WhatsApp: inicializando cliente', {
+            headless,
+            executablePath: executablePath || null,
+            authPath: authPath || null
+        });
+
         this.client = new Client({
-            authStrategy: new LocalAuth({
-                clientId: 'clinica-andreia-ballejo'
-            }),
+            authStrategy: new LocalAuth(authStrategyOptions),
             puppeteer: {
                 headless,
                 executablePath,
