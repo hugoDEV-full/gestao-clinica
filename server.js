@@ -1395,14 +1395,20 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         const baseUrl = await getAppBaseUrlFromConfig(db, req);
         const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}` : '';
 
-        // Verificar se tem SMTP configurado
+        // Sempre tentar SMTP primeiro
         const transporter = await getMailerTransporterFromConfig(db);
         
         if (!transporter) {
-            // Sem email - mostrar código na tela
+            // Sem SMTP - mostrar código na tela com aviso
+            console.error('❌ SMTP não configurado - variáveis:', {
+                EMAIL_HOST: process.env.EMAIL_HOST,
+                EMAIL_USER: process.env.EMAIL_USER,
+                EMAIL_PASS: process.env.EMAIL_PASS ? 'SIM' : 'NÃO'
+            });
+            
             return res.render('forgot-password', {
                 error: null,
-                info: `Código de redefinição gerado! Anote: <strong>${code}</strong><br><small>Válido por ${ttlMinutes} minutos</small><br><br>Link: <a href="${resetLink}">${resetLink}</a>`,
+                info: `⚠️ <strong>Email não configurado!</strong><br>Código de redefinição: <strong>${code}</strong><br><small>Válido por ${ttlMinutes} minutos</small><br><br>Link: <a href="${resetLink}">${resetLink}</a><br><br><small>Configure SMTP no Railway para receber emails.</small>`,
                 usuario: user,
                 currentPage: ''
             });
@@ -1426,20 +1432,34 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             <p><em>Se não solicitou, ignore este email.</em></p>
         `;
 
-        await transporter.sendMail({
-            from,
-            to: user.email,
-            subject,
-            text,
-            html
-        });
-
-        return res.render('forgot-password', {
-            error: null,
-            info: 'Email de redefinição enviado! Verifique sua caixa de entrada.',
-            usuario: user,
-            currentPage: ''
-        });
+        try {
+            await transporter.sendMail({
+                from,
+                to: user.email,
+                subject,
+                text,
+                html
+            });
+            
+            console.log('✅ Email enviado com sucesso para:', user.email);
+            
+            return res.render('forgot-password', {
+                error: null,
+                info: 'Email de redefinição enviado! Verifique sua caixa de entrada (e spam/promoções).',
+                usuario: user,
+                currentPage: ''
+            });
+            
+        } catch (emailError) {
+            console.error('❌ Erro ao enviar email:', emailError);
+            
+            return res.render('forgot-password', {
+                error: `Erro ao enviar email: ${emailError.message}`,
+                info: `Código de emergência: <strong>${code}</strong><br>Link: <a href="${resetLink}">${resetLink}</a>`,
+                usuario: user,
+                currentPage: ''
+            });
+        }
 
     } catch (e) {
         console.error('Erro no forgot-password:', e);
@@ -1592,7 +1612,45 @@ app.post('/login', authLimiter, async (req, res) => {
     }
 });
 
-/*
+// Debug SMTP endpoint (remover em produção)
+app.get('/debug-smtp', (req, res) => {
+    const debug = {
+        environment: {
+            EMAIL_HOST: process.env.EMAIL_HOST || '❌ Não configurado',
+            EMAIL_PORT: process.env.EMAIL_PORT || '❌ Não configurado',
+            EMAIL_USER: process.env.EMAIL_USER || '❌ Não configurado',
+            EMAIL_PASS: process.env.EMAIL_PASS ? '✅ Configurado' : '❌ Não configurado',
+            EMAIL_FROM: process.env.EMAIL_FROM || '❌ Não configurado',
+            APP_BASE_URL: process.env.APP_BASE_URL || '❌ Não configurado',
+            NODE_ENV: process.env.NODE_ENV || 'development'
+        },
+        smtp_test: null
+    };
+    
+    // Testar se SMTP está configurado
+    const host = (process.env.EMAIL_HOST || '').toString().trim();
+    const user = (process.env.EMAIL_USER || '').toString().trim();
+    const pass = (process.env.EMAIL_PASS || '').toString();
+    
+    if (host && user && pass) {
+        debug.smtp_test = {
+            status: '✅ SMTP parece configurado',
+            next_step: 'Teste forgot-password para verificar envio real'
+        };
+    } else {
+        debug.smtp_test = {
+            status: '❌ SMTP não configurado',
+            missing: [
+                !process.env.EMAIL_HOST ? 'EMAIL_HOST' : null,
+                !process.env.EMAIL_USER ? 'EMAIL_USER' : null,
+                !process.env.EMAIL_PASS ? 'EMAIL_PASS' : null
+            ].filter(Boolean)
+        };
+    }
+    
+    res.json(debug);
+});
+
 // Rota pública de registro de usuário
 app.get('/register', (req, res) => {
     res.render('register', { 
