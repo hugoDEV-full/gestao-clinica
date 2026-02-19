@@ -1576,6 +1576,134 @@ app.post('/login', authLimiter, async (req, res) => {
     }
 });
 
+// Rota pública de registro de usuário
+app.get('/register', (req, res) => {
+    res.render('register', { 
+        error: null, 
+        success: null,
+        nome: '',
+        email: '',
+        cpf: '',
+        telefone: ''
+    });
+});
+
+// Processar registro de usuário
+app.post('/register', async (req, res) => {
+    const { nome, email, senha, confirmarSenha, cpf, telefone } = req.body;
+    
+    // Validações básicas
+    if (!nome || !email || !senha || !confirmarSenha) {
+        return res.render('register', { 
+            error: 'Preencha todos os campos obrigatórios', 
+            success: null,
+            nome: nome || '',
+            email: email || '',
+            cpf: cpf || '',
+            telefone: telefone || ''
+        });
+    }
+    
+    if (senha !== confirmarSenha) {
+        return res.render('register', { 
+            error: 'As senhas não coincidem', 
+            success: null,
+            nome: nome || '',
+            email: email || '',
+            cpf: cpf || '',
+            telefone: telefone || ''
+        });
+    }
+    
+    if (senha.length < 6) {
+        return res.render('register', { 
+            error: 'A senha deve ter pelo menos 6 caracteres', 
+            success: null,
+            nome: nome || '',
+            email: email || '',
+            cpf: cpf || '',
+            telefone: telefone || ''
+        });
+    }
+    
+    const emailTrim = email.trim().toLowerCase();
+    const nomeTrim = nome.trim();
+    const cpfTrim = cpf ? cpf.replace(/\D/g, '') : '';
+    const telefoneTrim = telefone ? telefone.replace(/\D/g, '') : '';
+    
+    try {
+        const db = getDB();
+        
+        // Verificar se email já existe
+        const [emailExistente] = await db.execute(
+            'SELECT id FROM usuarios WHERE email = ?',
+            [emailTrim]
+        );
+        
+        if (emailExistente.length > 0) {
+            return res.render('register', { 
+                error: 'Este email já está cadastrado', 
+                success: null,
+                nome: nomeTrim,
+                email: emailTrim,
+                cpf: cpf,
+                telefone: telefone
+            });
+        }
+        
+        // Verificar se CPF já existe (se informado)
+        if (cpfTrim) {
+            const [cpfExistente] = await db.execute(
+                'SELECT id FROM usuarios WHERE cpf = ?',
+                [cpfTrim]
+            );
+            
+            if (cpfExistente.length > 0) {
+                return res.render('register', { 
+                    error: 'Este CPF já está cadastrado', 
+                    success: null,
+                    nome: nomeTrim,
+                    email: emailTrim,
+                    cpf: cpf,
+                    telefone: telefone
+                });
+            }
+        }
+        
+        // Hash da senha
+        const senhaHash = await bcrypt.hash(senha, 10);
+        
+        // Inserir usuário com tipo 'secretaria' por padrão (não admin)
+        await db.execute(
+            `INSERT INTO usuarios (nome, email, senha, tipo, cpf, telefone, ativo) 
+             VALUES (?, ?, ?, 'secretaria', ?, ?, 1)`,
+            [nomeTrim, emailTrim, senhaHash, cpfTrim || null, telefoneTrim || null]
+        );
+        
+        console.log(`[${nowLabel()}] NOVO USUÁRIO REGISTRADO: ${emailTrim} (${nomeTrim})`);
+        
+        return res.render('register', { 
+            error: null, 
+            success: 'Usuário cadastrado com sucesso! Você já pode fazer login.',
+            nome: '',
+            email: '',
+            cpf: '',
+            telefone: ''
+        });
+        
+    } catch (error) {
+        console.error('Erro no registro:', error);
+        return res.render('register', { 
+            error: 'Erro ao cadastrar usuário. Tente novamente.', 
+            success: null,
+            nome: nomeTrim,
+            email: emailTrim,
+            cpf: cpf,
+            telefone: telefone
+        });
+    }
+});
+
 app.get('/logout', (req, res) => {
     try {
         const usuarioId = req && req.session && req.session.usuario ? req.session.usuario.id : null;

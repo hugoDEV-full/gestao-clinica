@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - Clínica Andreia Ballejo</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        .login-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            max-width: 500px;
+            width: 100%;
+        }
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .login-body {
+            padding: 40px;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-login {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .btn-login:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        .btn-back {
+            background: #6c757d;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: white;
+        }
+        .btn-back:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h3><i class="bi bi-person-plus-fill"></i> Criar Conta</h3>
+                <p class="mb-0">Clínica Andreia Ballejo Fisioterapia</p>
+            </div>
+            <div class="login-body">
+                <% if (error) { %>
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <%= error %>
+                    </div>
+                <% } %>
+                
+                <% if (success) { %>
+                    <div class="alert alert-success" role="alert">
+                        <i class="bi bi-check-circle-fill"></i> <%= success %>
+                    </div>
+                <% } %>
+                
+                <form method="POST" action="/register">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">
+                            <i class="bi bi-person"></i> Nome Completo *
+                        </label>
+                        <input type="text" class="form-control" id="nome" name="nome" 
+                               value="<%= nome %>" required maxlength="150">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">
+                            <i class="bi bi-envelope"></i> Email *
+                        </label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="<%= email %>" required maxlength="100">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="cpf" class="form-label">
+                            <i class="bi bi-card-text"></i> CPF
+                        </label>
+                        <input type="text" class="form-control" id="cpf" name="cpf" 
+                               value="<%= cpf %>" maxlength="14" 
+                               placeholder="000.000.000-00">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="telefone" class="form-label">
+                            <i class="bi bi-telephone"></i> Telefone
+                        </label>
+                        <input type="tel" class="form-control" id="telefone" name="telefone" 
+                               value="<%= telefone %>" maxlength="20" 
+                               placeholder="(00) 00000-0000">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="senha" class="form-label">
+                            <i class="bi bi-lock"></i> Senha *
+                        </label>
+                        <input type="password" class="form-control" id="senha" name="senha" 
+                               required minlength="6">
+                        <div class="form-text">Mínimo 6 caracteres</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirmarSenha" class="form-label">
+                            <i class="bi bi-lock-fill"></i> Confirmar Senha *
+                        </label>
+                        <input type="password" class="form-control" id="confirmarSenha" 
+                               name="confirmarSenha" required minlength="6">
+                    </div>
+                    
+                    <div class="d-grid gap-2 mb-3">
+                        <button type="submit" class="btn btn-primary btn-login">
+                            <i class="bi bi-person-plus"></i> Criar Conta
+                        </button>
+                    </div>
+                    
+                    <div class="text-center">
+                        <a href="/login" class="btn btn-back btn-sm">
+                            <i class="bi bi-arrow-left"></i> Voltar ao Login
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Máscaras para CPF e Telefone -->
+    <script>
+        function formatCPF(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            
+            if (value.length > 9) {
+                value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            } else if (value.length > 6) {
+                value = value.replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
+            } else if (value.length > 3) {
+                value = value.replace(/(\d{3})(\d{3})/, '$1.$2');
+            }
+            
+            input.value = value;
+        }
+        
+        function formatTelefone(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            
+            if (value.length > 10) {
+                value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+            } else if (value.length > 6) {
+                value = value.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+            } else if (value.length > 2) {
+                value = value.replace(/(\d{2})(\d{4})/, '($1) $2');
+            }
+            
+            input.value = value;
+        }
+        
+        document.getElementById('cpf').addEventListener('input', function() {
+            formatCPF(this);
+        });
+        
+        document.getElementById('telefone').addEventListener('input', function() {
+            formatTelefone(this);
+        });
+    </script>
+</body>
+</html>
