@@ -389,12 +389,12 @@ app.use('/generated_backups', express.static(path.join(__dirname, 'generated_bac
 
 // Configuração de sessão melhorada
 const isProd = process.env.NODE_ENV === 'production';
-const sessionSecret = process.env.SESSION_SECRET || 'segredo_padrao_muito_secreto';
-if (isProd && sessionSecret === 'segredo_padrao_muito_secreto') {
+const sessionSecretFinal = sessionSecret || 'segredo_padrao_muito_secreto';
+if (isProd && sessionSecretFinal === 'segredo_padrao_muito_secreto') {
     console.warn('SESSION_SECRET não configurado em produção. Configure SESSION_SECRET no .env');
 }
 app.use(session({
-    secret: sessionSecret,
+    secret: sessionSecretFinal,
     resave: false,
     saveUninitialized: false,
     cookie: { 
