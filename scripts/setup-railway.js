@@ -61,7 +61,16 @@ async function setup() {
     for (const statement of statements) {
       if (statement.trim()) {
         console.log('🔧 Executando:', statement.substring(0, 80) + '...');
-        await connection.query(statement);
+        try {
+          await connection.query(statement);
+        } catch (err) {
+          // Ignorar erro de tabela já existente, mas mostrar outros
+          if (err.code === 'ER_TABLE_EXISTS_ERROR' || err.message.includes('already exists')) {
+            console.log('⚠️ Tabela já existe, ignorando...');
+          } else {
+            throw err;
+          }
+        }
       }
     }
     await connection.end();
