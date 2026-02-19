@@ -49,8 +49,21 @@ async function setup() {
     const schema = fs.readFileSync(schemaPath, 'utf8');
     console.log('📄 Schema carregado, executando...');
     
-    // Executar schema
-    await connection.query(schema);
+    // Dividir o schema em statements individuais
+    const statements = schema
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('--'));
+    
+    console.log(`📊 Executando ${statements.length} statements...`);
+    
+    // Executar cada statement separadamente
+    for (const statement of statements) {
+      if (statement.trim()) {
+        console.log('🔧 Executando:', statement.substring(0, 80) + '...');
+        await connection.query(statement);
+      }
+    }
     await connection.end();
     
     console.log('✅ Schema importado com sucesso!');
