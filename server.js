@@ -157,11 +157,11 @@ async function getAppBaseUrlFromConfig(db, req) {
 }
 
 function getMailerTransporter() {
-    const host = (process.env.SMTP_HOST || '').toString().trim();
-    const port = Number(process.env.SMTP_PORT || 587);
-    const user = (process.env.SMTP_USER || '').toString().trim();
-    const pass = (process.env.SMTP_PASS || '').toString();
-    const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || String(process.env.SMTP_SECURE || '') === '1';
+    const host = (process.env.EMAIL_HOST || process.env.SMTP_HOST || '').toString().trim();
+    const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 587);
+    const user = (process.env.EMAIL_USER || process.env.SMTP_USER || '').toString().trim();
+    const pass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').toString();
+    const secure = String(process.env.EMAIL_SECURE || process.env.SMTP_SECURE || '').toLowerCase() === 'true' || String(process.env.EMAIL_SECURE || process.env.SMTP_SECURE || '') === '1';
 
     if (!host || !user || !pass) return null;
 
@@ -198,7 +198,7 @@ async function notifyBlockedAccessAttempt(db, colaborador, motivo, req) {
         const fromCfg = await getAppConfigValue(db, 'SMTP_FROM');
         const from = (fromCfg != null && String(fromCfg).trim())
             ? String(fromCfg).trim()
-            : (process.env.SMTP_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
+            : (process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
 
         const subject = 'Alerta de acesso bloqueado - Controle de Acesso';
         const link = baseUrl ? `${baseUrl}/colaboradores/${colaborador.id}` : '';
@@ -1412,7 +1412,7 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         const cfgFrom = await getAppConfigValue(db, 'SMTP_FROM');
         const from = (cfgFrom != null && String(cfgFrom).trim())
             ? String(cfgFrom).trim()
-            : (process.env.SMTP_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
+            : (process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
 
         const subject = 'Redefinição de Senha - Clínica Andreia Ballejo';
         const text = `Olá ${user.nome},\n\nRecebemos uma solicitação para redefinir sua senha.\n\nCódigo: ${code}\nLink: ${resetLink}\n\nEste código expira em ${ttlMinutes} minutos.\n\nSe não solicitou, ignore este email.`;
