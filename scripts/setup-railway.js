@@ -118,7 +118,13 @@ async function createDefaultAdmin() {
     );
     
     if (existing.length > 0) {
-      console.log('✅ Usuário admin padrão já existe.');
+      console.log('🔄 Usuário admin padrão já existe. Atualizando senha...');
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      await connection.execute(
+        'UPDATE usuarios SET senha = ?, tipo = ?, ativo = 1 WHERE email = ?',
+        [hashedPassword, tipo, email]
+      );
+      console.log('✅ Senha do admin atualizada com sucesso!');
     } else {
       // Hash da senha
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
