@@ -131,10 +131,10 @@
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
-                                                <%= consulta.paciente_nome.charAt(0).toUpperCase() %>
+                                                <%= (consulta.paciente_nome || 'P').charAt(0).toUpperCase() %>
                                             </div>
                                             <div>
-                                                <div class="fw-bold"><%= consulta.paciente_nome %></div>
+                                                <div class="fw-bold"><%= consulta.paciente_nome || 'Não informado' %></div>
                                                 <small class="text-muted"><%= consulta.tipo_consulta || 'Consulta' %></small>
                                             </div>
                                         </div>
@@ -186,10 +186,10 @@
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="avatar-sm bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-2">
-                                                <%= consulta.paciente_nome.charAt(0).toUpperCase() %>
+                                                <%= (consulta.paciente_nome || 'P').charAt(0).toUpperCase() %>
                                             </div>
                                             <div>
-                                                <div class="fw-bold"><%= consulta.paciente_nome %></div>
+                                                <div class="fw-bold"><%= consulta.paciente_nome || 'Não informado' %></div></div>
                                                 <small class="text-muted"><%= consulta.tipo_consulta || 'Consulta' %></small>
                                             </div>
                                         </div>
