@@ -9,7 +9,9 @@
     "dev": "nodemon server.js",
     "setup": "node scripts/setup-railway.js",
     "create-admin": "node scripts/create-admin.js",
-    "debug-password": "node scripts/debug-password.js"
+    "debug-password": "node scripts/debug-password.js",
+    "check-smtp": "node scripts/check-smtp-config.js",
+    "carga-inicial": "node scripts/carga-inicial.js"
   },
   "keywords": [],
   "author": "",
