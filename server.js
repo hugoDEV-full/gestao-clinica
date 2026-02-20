@@ -1971,11 +1971,11 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
         // Profissionais
         console.log('👨‍⚕️ Criando profissionais...');
         const [profResult] = await connection.execute(`
-            INSERT INTO profissionais (id, nome, especialidade, registro_profissional, telefone, email, ativo) VALUES
-            (1, 'Dr. Carlos Silva', 'Clínico Geral', 'CRM-DF 12345', '61982976481', 'carlos@clinica.com', 1),
-            (2, 'Dra. Andreia Ballejo', 'Fisioterapeuta', 'CREFITO 12345', '61982976482', 'andreia@clinica.com', 1),
-            (3, 'Dr. Pedro Oliveira', 'Ortopedista', 'CRM-DF 67890', '61982976483', 'pedro@clinica.com', 1),
-            (4, 'Dra. Maria Santos', 'Cardiologista', 'CRM-DF 11111', '61982976484', 'maria@clinica.com', 1)
+            INSERT INTO profissionais (id, nome, cpf, especialidade, registro_profissional, telefone, email, ativo) VALUES
+            (1, 'Dr. Carlos Silva', '12345678901', 'Clínico Geral', 'CRM-DF 12345', '61982976481', 'carlos@clinica.com', 1),
+            (2, 'Dra. Andreia Ballejo', '98765432109', 'Fisioterapeuta', 'CREFITO 12345', '61982976482', 'andreia@clinica.com', 1),
+            (3, 'Dr. Pedro Oliveira', '45678912301', 'Ortopedista', 'CRM-DF 67890', '61982976483', 'pedro@clinica.com', 1),
+            (4, 'Dra. Maria Santos', '78912345601', 'Cardiologista', 'CRM-DF 11111', '61982976484', 'maria@clinica.com', 1)
         `);
         console.log(`✅ ${profResult.affectedRows} profissionais criados`);
 
