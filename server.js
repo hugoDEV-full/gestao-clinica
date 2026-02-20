@@ -1865,42 +1865,200 @@ app.post('/login', authLimiter, async (req, res) => {
 });
 
 // Debug SMTP endpoint (remover em produção)
-app.get('/debug-smtp', (req, res) => {
-    const debug = {
-        environment: {
-            EMAIL_HOST: process.env.EMAIL_HOST || '❌ Não configurado',
-            EMAIL_PORT: process.env.EMAIL_PORT || '❌ Não configurado',
-            EMAIL_USER: process.env.EMAIL_USER || '❌ Não configurado',
-            EMAIL_PASS: process.env.EMAIL_PASS ? '✅ Configurado' : '❌ Não configurado',
-            EMAIL_FROM: process.env.EMAIL_FROM || '❌ Não configurado',
-            APP_BASE_URL: process.env.APP_BASE_URL || '❌ Não configurado',
-            NODE_ENV: process.env.NODE_ENV || 'development'
-        },
-        smtp_test: null
-    };
-    
-    // Testar se SMTP está configurado
-    const host = (process.env.EMAIL_HOST || '').toString().trim();
-    const user = (process.env.EMAIL_USER || '').toString().trim();
-    const pass = (process.env.EMAIL_PASS || '').toString();
-    
-    if (host && user && pass) {
-        debug.smtp_test = {
-            status: '✅ SMTP parece configurado',
-            next_step: 'Teste forgot-password para verificar envio real'
+app.get('/debug-smtp', async (req, res) => {
+    try {
+        const db = getDB();
+        const transporter = await getMailerTransporterFromConfig(db);
+        
+        const debug = {
+            environment: {
+                EMAIL_HOST: process.env.EMAIL_HOST,
+                EMAIL_PORT: process.env.EMAIL_PORT,
+                EMAIL_USER: process.env.EMAIL_USER,
+                EMAIL_PASS: process.env.EMAIL_PASS ? '✅ Configurado' : '❌ Não configurado',
+                EMAIL_FROM: process.env.EMAIL_FROM,
+                APP_BASE_URL: process.env.APP_BASE_URL,
+                NODE_ENV: process.env.NODE_ENV
+            },
+            smtp_test: {
+                status: transporter ? '✅ SMTP parece configurado' : '❌ SMTP não configurado',
+                next_step: transporter ? 'Teste forgot-password para verificar envio real' : 'Configure variáveis EMAIL_*'
+            },
+            config_db: {
+                SMTP_HOST: await getAppConfigValue(db, 'SMTP_HOST'),
+                SMTP_PORT: await getAppConfigValue(db, 'SMTP_PORT'),
+                SMTP_USER: await getAppConfigValue(db, 'SMTP_USER'),
+                SMTP_FROM: await getAppConfigValue(db, 'SMTP_FROM')
+            }
         };
-    } else {
-        debug.smtp_test = {
-            status: '❌ SMTP não configurado',
-            missing: [
-                !process.env.EMAIL_HOST ? 'EMAIL_HOST' : null,
-                !process.env.EMAIL_USER ? 'EMAIL_USER' : null,
-                !process.env.EMAIL_PASS ? 'EMAIL_PASS' : null
-            ].filter(Boolean)
-        };
+        
+        res.json(debug);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-    
-    res.json(debug);
+});
+
+// ROTA PARA CARGA INICIAL MANUAL
+app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res) => {
+    try {
+        console.log('🚀 Iniciando carga inicial manual via rota /carga-inicial...');
+        
+        // Executar carga inicial diretamente
+        const bcrypt = require('bcrypt');
+        const mysql = require('mysql2/promise');
+        
+        // Configuração do banco
+        const dbConfig = {
+            host: process.env.DB_HOST || process.env.RAILWAY_MYSQLHOST || 'localhost',
+            port: process.env.DB_PORT || process.env.RAILWAY_MYSQLPORT || 3306,
+            user: process.env.DB_USER || process.env.RAILWAY_MYSQLUSER || 'root',
+            password: process.env.DB_PASSWORD || process.env.RAILWAY_MYSQLPASSWORD || '',
+            database: process.env.DB_NAME || process.env.RAILWAY_MYSQLDATABASE || 'railway',
+            timezone: process.env.DB_TIMEZONE || '+00:00'
+        };
+        
+        const connection = await mysql.createConnection(dbConfig);
+        
+        // Limpar dados existentes
+        console.log('🧹 Limpando dados existentes...');
+        await connection.execute('SET FOREIGN_KEY_CHECKS = 0');
+        
+        const tables = [
+            'prontuario_evolucoes', 'prontuarios', 'financeiro', 'lembretes', 
+            'agendamentos', 'agenda', 'ponto_logs', 'access_logs', 'password_resets',
+            'colaborador_devices', 'access_tokens', 'colaboradores', 
+            'pacientes', 'profissionais', 'logs_lgpd'
+        ];
+        
+        for (const table of tables) {
+            await connection.execute(`DELETE FROM ${table}`);
+        }
+        
+        await connection.execute('SET FOREIGN_KEY_CHECKS = 1');
+        console.log('✅ Dados limpos com sucesso!');
+
+        // Profissionais
+        console.log('👨‍⚕️ Criando profissionais...');
+        await connection.execute(`
+            INSERT INTO profissionais (id, nome, especialidade, crm, telefone, email, ativo, created_at) VALUES
+            (1, 'Dr. Carlos Silva', 'Clínico Geral', 'CRM-DF 12345', '61982976481', 'carlos@clinica.com', 1, NOW()),
+            (2, 'Dra. Andreia Ballejo', 'Fisioterapeuta', 'CREFITO 12345', '61982976482', 'andreia@clinica.com', 1, NOW()),
+            (3, 'Dr. Pedro Oliveira', 'Ortopedista', 'CRM-DF 67890', '61982976483', 'pedro@clinica.com', 1, NOW()),
+            (4, 'Dra. Maria Santos', 'Cardiologista', 'CRM-DF 11111', '61982976484', 'maria@clinica.com', 1, NOW())
+        `);
+
+        // Pacientes
+        console.log('👥 Criando pacientes...');
+        await connection.execute(`
+            INSERT INTO pacientes (id, nome, cpf, rg, data_nascimento, telefone, email, endereco, cidade, uf, cep, convenio, cartao_convenio, observacoes, ativo, created_at) VALUES
+            (1, 'João da Silva', '12345678901', 'MG-12.345.678', '1985-03-15', '61982976481', 'joao.silva@email.com', 'Quadra 102 Norte, Bloco A, Apt 301', 'Brasília', 'DF', '70722-520', 'Unimed', '123456789', 'Alergico a penicilina', 1, NOW()),
+            (2, 'Maria Oliveira', '98765432109', 'DF-98.765.432', '1990-07-22', '61982976485', 'maria.oliveira@email.com', 'SGAS 605, Conjunto D', 'Brasília', 'DF', '70200-660', 'Amil', '987654321', 'Hipertensa', 1, NOW()),
+            (3, 'Pedro Santos', '45678912301', 'GO-45.678.912', '1978-11-30', '61982976486', 'pedro.santos@email.com', 'CLN 405, Bloco B, Sala 201', 'Brasília', 'DF', '70845-520', 'Bradesco', '456789123', 'Diabético', 1, NOW()),
+            (4, 'Ana Costa', '78912345601', 'BA-78.912.345', '1995-05-18', '61982976487', 'ana.costa@email.com', 'SIA Trecho 3, Lote 850', 'Brasília', 'DF', '71200-030', 'SulAmérica', '789123456', 'Nenhuma', 1, NOW()),
+            (5, 'Carlos Ferreira', '32165498701', 'RJ-32.165.498', '1982-09-10', '61982976488', 'carlos.ferreira@email.com', 'EQS 406/407, Bloco A, Sala 101', 'Brasília', 'DF', '70630-000', 'Porto Seguro', '321654987', 'Asmático', 1, NOW())
+        `);
+
+        // Agenda
+        console.log('📅 Criando agenda...');
+        await connection.execute(`
+            INSERT INTO agenda (id, profissional_id, dia_semana, hora_inicio, hora_fim, intervalo_minutos, ativo, created_at) VALUES
+            (1, 1, 2, '08:00:00', '18:00:00', 30, 1, NOW()),
+            (2, 1, 3, '08:00:00', '18:00:00', 30, 1, NOW()),
+            (3, 1, 4, '08:00:00', '18:00:00', 30, 1, NOW()),
+            (4, 2, 2, '07:00:00', '19:00:00', 40, 1, NOW()),
+            (5, 2, 4, '07:00:00', '19:00:00', 40, 1, NOW()),
+            (6, 2, 6, '07:00:00', '19:00:00', 40, 1, NOW()),
+            (7, 3, 3, '09:00:00', '17:00:00', 45, 1, NOW()),
+            (8, 3, 5, '09:00:00', '17:00:00', 45, 1, NOW()),
+            (9, 4, 2, '08:00:00', '16:00:00', 60, 1, NOW()),
+            (10, 4, 4, '08:00:00', '16:00:00', 60, 1, NOW())
+        `);
+
+        // Agendamentos
+        console.log('📋 Criando agendamentos...');
+        await connection.execute(`
+            INSERT INTO agendamentos (id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, created_at) VALUES
+            (1, 1, 1, '2026-02-24 09:00:00', 30, 'consulta', 'confirmado', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
+            (2, 2, 2, '2026-02-24 10:00:00', 40, 'avaliacao', 'confirmado', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
+            (3, 3, 3, '2026-02-24 14:00:00', 45, 'retorno', 'agendado', 250.00, 'pix', 'pendente', 'Bradesco', 'Retorno pós-cirurgia', 1, 1, NOW()),
+            (4, 4, 4, '2026-02-24 15:00:00', 60, 'consulta', 'agendado', 300.00, 'cartao', 'pendente', 'SulAmérica', 'Consulta de rotina', 1, 1, NOW()),
+            (5, 5, 1, '2026-02-25 08:30:00', 30, 'consulta', 'agendado', 200.00, 'dinheiro', 'pendente', 'Porto Seguro', 'Consulta de emergência', 1, 1, NOW()),
+            (6, 1, 2, '2026-02-25 14:00:00', 40, 'sessao', 'agendado', 150.00, 'pix', 'pendente', 'Unimed', 'Sessão de alongamento', 1, 1, NOW()),
+            (7, 2, 3, '2026-02-26 10:00:00', 45, 'avaliacao', 'agendado', 250.00, 'cartao', 'pendente', 'Amil', 'Avaliação ortopédica', 1, 1, NOW()),
+            (8, 3, 4, '2026-02-26 11:00:00', 60, 'exame', 'agendado', 400.00, 'dinheiro', 'pendente', 'Bradesco', 'Teste de esforço', 1, 1, NOW())
+        `);
+
+        // Prontuários
+        console.log('🏥 Criando prontuários...');
+        await connection.execute(`
+            INSERT INTO prontuarios (id, paciente_id, profissional_id, data_abertura, queixa_principal, historico_doenca_atual, antecedentes_pessoais, antecedentes_familiares, hábitos_vida, alergias, medicamentos_em_uso, exames_realizados, hipotese_diagnostica, tratamento, evolucao, created_at) VALUES
+            (1, 1, 1, '2026-01-15', 'Dor lombar crônica', 'Paciente refere dor na região lombar há 6 meses', 'Hipertensão controlada', 'Pai diabético', 'Sedentário, fumante (10 cigarros/dia)', 'Penicilina', 'Losartana 50mg/dia', 'RX coluna lombar', 'Hérnia de disco L4-L5', 'Fisioterapia + AINE', 'Paciente apresentando melhora da dor com fisioterapia', NOW()),
+            (2, 2, 2, '2026-01-20', 'Limitação de movimento no ombro direito', 'Após queda da própria altura há 2 meses', 'Nenhum', 'Mãe com artrite reumatoide', 'Pratica natação 3x/semana', 'Nenhuma', 'Anticoncepcional', 'Ressonância magnética do ombro', 'Lesão do manguito rotador', 'Fisioterapia intensiva', 'Recuperação lenta mas progressiva', NOW()),
+            (3, 3, 3, '2026-01-10', 'Dor no joelho esquerdo', 'Dor progressiva ao caminhar', 'Diabetes tipo 2', 'Nenhum', 'Sedentário', 'Nenhuma', 'Metformina 850mg 2x/dia, Insulina NPH', 'RX joelho, Glicemia', 'Artrose grau II', 'Perda de peso + Fisioterapia', 'Paciente aderindo ao tratamento', NOW()),
+            (4, 4, 4, '2026-01-25', 'Palpitações', 'Episódios de taquicardia ao esforço', 'Nenhum', 'Pai com cardiopatia isquêmica', 'Corredora amadora', 'Nenhuma', 'Nenhum', 'ECG, Holter, Eco', 'Arritmia benigna', 'Beta-bloqueador se necessário', 'Exames normais, manter observação', NOW()),
+            (5, 5, 1, '2026-02-01', 'Dor abdominal', 'Dor epigástrica pós-prandial', 'Asma leve', 'Nenhum', 'Ex-fumante', 'AAS', 'Salbutamol spray', 'Endoscopia digestiva', 'Gastrite leve', 'Omeprazol + dieta', 'Sintomas melhoraram com medicação', NOW())
+        `);
+
+        // Financeiro
+        console.log('💰 Criando registros financeiros...');
+        await connection.execute(`
+            INSERT INTO financeiro (id, paciente_id, profissional_id, agendamento_id, tipo, descricao, valor, forma_pagamento, status, data_vencimento, data_pagamento, parcelas, observacoes, created_at) VALUES
+            (1, 1, 1, 1, 'receita', 'Consulta clínica', 200.00, 'dinheiro', 'pago', '2026-02-24', '2026-02-24', 1, 'Pago em dinheiro', NOW()),
+            (2, 2, 2, 2, 'receita', 'Avaliação fisioterapia', 150.00, 'cartao', 'pago', '2026-02-24', '2026-02-24', 1, 'Cartão de crédito', NOW()),
+            (3, 3, 3, 3, 'receita', 'Retorno ortopédico', 250.00, 'pix', 'pendente', '2026-02-24', NULL, 1, 'Aguardando pagamento', NOW()),
+            (4, 4, 4, 4, 'receita', 'Consulta cardiológica', 300.00, 'cartao', 'pendente', '2026-02-24', NULL, 1, 'Pagamento no dia da consulta', NOW()),
+            (5, 5, 1, 5, 'receita', 'Consulta de emergência', 200.00, 'dinheiro', 'pendente', '2026-02-25', NULL, 1, 'Pagar no local', NOW()),
+            (6, NULL, NULL, NULL, 'despesa', 'Aluguel do consultório', 3000.00, 'transferencia', 'pago', '2026-02-01', '2026-02-01', 1, 'Aluguel fevereiro', NOW()),
+            (7, NULL, NULL, NULL, 'despesa', 'Material de consumo', 450.00, 'dinheiro', 'pago', '2026-02-15', '2026-02-15', 1, 'Luvas, seringas, algodão', NOW())
+        `);
+
+        // Lembretes
+        console.log('⏰ Criando lembretes...');
+        await connection.execute(`
+            INSERT INTO lembretes (id, paciente_id, profissional_id, tipo, titulo, mensagem, data_envio, status, via_whatsapp, via_email, agenda_id, created_at) VALUES
+            (1, 1, 1, 'consulta', 'Lembrete: Consulta Dr. Carlos', 'Olá João! Lembrete da sua consulta amanhã às 09:00 com Dr. Carlos Silva. Chegue 15 minutos antes.', '2026-02-23 18:00:00', 'enviado', 1, 1, 1, NOW()),
+            (2, 2, 2, 'consulta', 'Lembrete: Fisioterapia', 'Olá Maria! Sua sessão de fisioterapia amanhã às 10:00 com Dra. Andreia. Use roupas confortáveis.', '2026-02-23 18:00:00', 'enviado', 1, 1, 2, NOW()),
+            (3, 3, 3, 'consulta', 'Lembrete: Retorno Ortopedia', 'Olá Pedro! Seu retorno com Dr. Pedro está confirmado para 14:00 de 24/02. Traga exames anteriores.', '2026-02-23 18:00:00', 'pendente', 1, 1, 3, NOW()),
+            (4, 4, 4, 'consulta', 'Lembrete: Consulta Cardiologia', 'Olá Ana! Sua consulta cardiológica dia 24/02 às 15:00. Evite café antes do exame.', '2026-02-23 18:00:00', 'pendente', 1, 1, 4, NOW()),
+            (5, 5, 1, 'consulta', 'Lembrete: Consulta Emergência', 'Olá Carlos! Sua consulta de emergência dia 25/02 às 08:30. Aguardamos você.', '2026-02-24 18:00:00', 'pendente', 1, 1, 5, NOW())
+        `);
+
+        // Configurações
+        console.log('⚙️ Configurando sistema...');
+        await connection.execute(`
+            INSERT INTO app_config (chave, valor, descricao, created_at) VALUES
+            ('CLINICA_NOME', 'Clínica Andreia Ballejo', 'Nome da clínica', NOW()),
+            ('CLINICA_TELEFONE', '61982976481', 'Telefone da clínica', NOW()),
+            ('CLINICA_EMAIL', 'contato@clinicaballejo.com', 'Email da clínica', NOW()),
+            ('CLINICA_ENDERECO', 'SGAS 605, Conjunto D - Asa Sul, Brasília - DF', 'Endereço da clínica', NOW()),
+            ('VALOR_CONSULTA_PADRAO', '200.00', 'Valor padrão da consulta', NOW())
+            ON DUPLICATE KEY UPDATE valor = VALUES(valor)
+        `);
+
+        await connection.end();
+
+        console.log('\n🎉 CARGA INICIAL CONCLUÍDA COM SUCESSO!');
+        
+        res.json({ 
+            success: true, 
+            message: '✅ Carga inicial executada com sucesso!',
+            data_created: {
+                pacientes: 5,
+                profissionais: 4,
+                agendamentos: 8,
+                prontuarios: 5,
+                financeiro: 7,
+                lembretes: 5
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro na carga inicial manual:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
 });
 
 // Rota pública de registro de usuário

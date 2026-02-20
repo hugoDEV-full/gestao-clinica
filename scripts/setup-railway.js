@@ -148,11 +148,19 @@ async function createDefaultAdmin() {
   }
   
   // CARGA INICIAL AUTOMÁTICA (se solicitado)
-  if (process.env.CARGA_INICIAL === 'true') {
-    console.log('\n🚀 Iniciando carga inicial de dados...');
+  console.log('\n🔍 VERIFICANDO CARGA INICIAL...');
+  console.log('CARGA_INICIAL (environment):', process.env.CARGA_INICIAL);
+  console.log('typeof CARGA_INICIAL:', typeof process.env.CARGA_INICIAL);
+  console.log('CARGA_INICIAL === "true":', process.env.CARGA_INICIAL === 'true');
+  console.log('CARGA_INICIAL == true:', process.env.CARGA_INICIAL == true);
+  
+  if (process.env.CARGA_INICIAL === 'true' || process.env.CARGA_INICIAL === true) {
+    console.log('\n🚀 INICIANDO CARGA INICIAL DE DADOS...');
+    console.log('Variável CARGA_INICIAL detectada como:', process.env.CARGA_INICIAL);
     await carregarDadosIniciais();
   } else {
     console.log('\n💡 Para carregar dados iniciais, defina CARGA_INICIAL=true nas variáveis de ambiente');
+    console.log('Valor atual de CARGA_INICIAL:', process.env.CARGA_INICIAL);
   }
 }
 
