@@ -1994,24 +1994,24 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
         // Agenda
         console.log('📅 Criando agenda...');
         const [agendaResult] = await connection.execute(`
-            INSERT INTO agenda (id, profissional_id, dia_semana, hora_inicio, hora_fim, intervalo_minutos, ativo, created_at) VALUES
-            (1, 1, 2, '08:00:00', '18:00:00', 30, 1, NOW()),
-            (2, 1, 3, '08:00:00', '18:00:00', 30, 1, NOW()),
-            (3, 1, 4, '08:00:00', '18:00:00', 30, 1, NOW()),
-            (4, 2, 2, '07:00:00', '19:00:00', 40, 1, NOW()),
-            (5, 2, 4, '07:00:00', '19:00:00', 40, 1, NOW()),
-            (6, 2, 6, '07:00:00', '19:00:00', 40, 1, NOW()),
-            (7, 3, 3, '09:00:00', '17:00:00', 45, 1, NOW()),
-            (8, 3, 5, '09:00:00', '17:00:00', 45, 1, NOW()),
-            (9, 4, 2, '08:00:00', '16:00:00', 60, 1, NOW()),
-            (10, 4, 4, '08:00:00', '16:00:00', 60, 1, NOW())
+            INSERT INTO agenda (id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, observacoes, data_cadastro) VALUES
+            (1, NULL, 1, '2026-02-24 08:00:00', 60, 'procedimento', 'agendado', NULL, NULL, 'Disponível para agendamentos', NOW()),
+            (2, NULL, 1, '2026-02-24 09:00:00', 60, 'procedimento', 'agendado', NULL, NULL, 'Disponível para agendamentos', NOW()),
+            (3, NULL, 1, '2026-02-24 10:00:00', 60, 'procedimento', 'agendado', NULL, NULL, 'Disponível para agendamentos', NOW()),
+            (4, NULL, 2, '2026-02-24 07:00:00', 40, 'procedimento', 'agendado', NULL, NULL, 'Disponível para fisioterapia', NOW()),
+            (5, NULL, 2, '2026-02-24 07:40:00', 40, 'procedimento', 'agendado', NULL, NULL, 'Disponível para fisioterapia', NOW()),
+            (6, NULL, 2, '2026-02-24 08:20:00', 40, 'procedimento', 'agendado', NULL, NULL, 'Disponível para fisioterapia', NOW()),
+            (7, NULL, 3, '2026-02-24 09:00:00', 45, 'procedimento', 'agendado', NULL, NULL, 'Disponível para ortopedia', NOW()),
+            (8, NULL, 3, '2026-02-24 09:45:00', 45, 'procedimento', 'agendado', NULL, NULL, 'Disponível para ortopedia', NOW()),
+            (9, NULL, 4, '2026-02-24 08:00:00', 60, 'procedimento', 'agendado', NULL, NULL, 'Disponível para cardiologia', NOW()),
+            (10, NULL, 4, '2026-02-24 09:00:00', 60, 'procedimento', 'agendado', NULL, NULL, 'Disponível para cardiologia', NOW())
         `);
         console.log(`✅ ${agendaResult.affectedRows} itens de agenda criados`);
 
         // Agendamentos
         console.log('📋 Criando agendamentos...');
         const [ageResult] = await connection.execute(`
-            INSERT INTO agendamentos (id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, created_at) VALUES
+            INSERT INTO agendamentos (id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, data_cadastro) VALUES
             (1, 1, 1, '2026-02-24 09:00:00', 30, 'consulta', 'confirmado', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
             (2, 2, 2, '2026-02-24 10:00:00', 40, 'avaliacao', 'confirmado', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
             (3, 3, 3, '2026-02-24 14:00:00', 45, 'retorno', 'agendado', 250.00, 'pix', 'pendente', 'Bradesco', 'Retorno pós-cirurgia', 1, 1, NOW()),

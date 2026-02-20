@@ -220,26 +220,10 @@ async function carregarDadosIniciais() {
       (5, 'Carlos Ferreira', '32165498701', 'RJ-32.165.498', '1982-09-10', '61982976488', 'carlos.ferreira@email.com', 'EQS 406/407, Bloco A, Sala 101', 'Brasília', 'DF', '70630-000', 'Porto Seguro', '321654987', 'Asmático', 1, NOW())
     `);
 
-    // 3. Agenda
-    console.log('📅 Criando agenda...');
+    // 3. Agendamentos (direto, sem tabela agenda)
+    console.log('� Criando agendamentos...');
     await connection.execute(`
-      INSERT INTO agenda (id, profissional_id, dia_semana, hora_inicio, hora_fim, intervalo_minutos, ativo, created_at) VALUES
-      (1, 1, 2, '08:00:00', '18:00:00', 30, 1, NOW()),
-      (2, 1, 3, '08:00:00', '18:00:00', 30, 1, NOW()),
-      (3, 1, 4, '08:00:00', '18:00:00', 30, 1, NOW()),
-      (4, 2, 2, '07:00:00', '19:00:00', 40, 1, NOW()),
-      (5, 2, 4, '07:00:00', '19:00:00', 40, 1, NOW()),
-      (6, 2, 6, '07:00:00', '19:00:00', 40, 1, NOW()),
-      (7, 3, 3, '09:00:00', '17:00:00', 45, 1, NOW()),
-      (8, 3, 5, '09:00:00', '17:00:00', 45, 1, NOW()),
-      (9, 4, 2, '08:00:00', '16:00:00', 60, 1, NOW()),
-      (10, 4, 4, '08:00:00', '16:00:00', 60, 1, NOW())
-    `);
-
-    // 4. Agendamentos
-    console.log('📋 Criando agendamentos...');
-    await connection.execute(`
-      INSERT INTO agendamentos (id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, created_at) VALUES
+      INSERT INTO agendamentos (id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, data_cadastro) VALUES
       (1, 1, 1, '2026-02-24 09:00:00', 30, 'consulta', 'confirmado', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
       (2, 2, 2, '2026-02-24 10:00:00', 40, 'avaliacao', 'confirmado', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
       (3, 3, 3, '2026-02-24 14:00:00', 45, 'retorno', 'agendado', 250.00, 'pix', 'pendente', 'Bradesco', 'Retorno pós-cirurgia', 1, 1, NOW()),
