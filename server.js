@@ -1448,7 +1448,24 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             
             return res.render('forgot-password', {
                 error: null,
-                info: `⚠️ <strong>Email não configurado!</strong><br>Código de redefinição: <strong>${code}</strong><br><small>Válido por ${ttlMinutes} minutos</small><br><br>Link: <a href="${resetLink}">${resetLink}</a><br><br><small>Configure SMTP no Railway para receber emails.</small>`,
+                info: `📧 <strong>Redefinição de Senha</strong><br><br>
+                       <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                           <strong>Código de Recuperação:</strong><br>
+                           <span style="font-size: 1.5em; font-weight: bold; color: #007bff; font-family: monospace;">${code}</span><br>
+                           <small style="color: #6c757d;">Válido por ${ttlMinutes} minutos</small>
+                       </div>
+                       
+                       <div style="background: #e7f3ff; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                           <strong>Link Direto:</strong><br>
+                           <a href="${resetLink}" style="word-break: break-all;">${resetLink}</a>
+                       </div>
+                       
+                       <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                           <small>💡 <strong>Como usar:</strong><br>
+                           1. Anote o código: <strong>${code}</strong><br>
+                           2. Clique no link acima ou copie e cole no navegador<br>
+                           3. Digite o código e sua nova senha</small>
+                       </div>`,
                 usuario: user,
                 currentPage: ''
             });
