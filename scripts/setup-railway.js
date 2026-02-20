@@ -212,7 +212,7 @@ async function carregarDadosIniciais() {
     // 2. Pacientes
     console.log('👥 Criando pacientes...');
     await connection.execute(`
-      INSERT INTO pacientes (id, nome, cpf, rg, data_nascimento, telefone, email, endereco, cidade, uf, cep, convenio, cartao_convenio, observacoes, ativo, created_at) VALUES
+      INSERT INTO pacientes (id, nome, cpf, rg, data_nascimento, telefone, email, endereco, cidade, estado, cep, convenio, numero_convenio, observacoes, ativo, data_cadastro) VALUES
       (1, 'João da Silva', '12345678901', 'MG-12.345.678', '1985-03-15', '61982976481', 'joao.silva@email.com', 'Quadra 102 Norte, Bloco A, Apt 301', 'Brasília', 'DF', '70722-520', 'Unimed', '123456789', 'Alergico a penicilina', 1, NOW()),
       (2, 'Maria Oliveira', '98765432109', 'DF-98.765.432', '1990-07-22', '61982976485', 'maria.oliveira@email.com', 'SGAS 605, Conjunto D', 'Brasília', 'DF', '70200-660', 'Amil', '987654321', 'Hipertensa', 1, NOW()),
       (3, 'Pedro Santos', '45678912301', 'GO-45.678.912', '1978-11-30', '61982976486', 'pedro.santos@email.com', 'CLN 405, Bloco B, Sala 201', 'Brasília', 'DF', '70845-520', 'Bradesco', '456789123', 'Diabético', 1, NOW()),
