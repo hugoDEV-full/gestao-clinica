@@ -2057,7 +2057,7 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
         // Lembretes
         console.log('⏰ Criando lembretes...');
         const [lemResult] = await connection.execute(`
-            INSERT INTO lembretes (id, paciente_id, profissional_id, tipo, titulo, mensagem, data_envio, status, via_whatsapp, via_email, agenda_id, created_at) VALUES
+            INSERT INTO lembretes (id, paciente_id, profissional_id, tipo, titulo, mensagem, data_envio, status, via_whatsapp, via_email, agenda_id, data_cadastro) VALUES
             (1, 1, 1, 'consulta', 'Lembrete: Consulta Dr. Carlos', 'Olá João! Lembrete da sua consulta amanhã às 09:00 com Dr. Carlos Silva. Chegue 15 minutos antes.', '2026-02-23 18:00:00', 'enviado', 1, 1, 1, NOW()),
             (2, 2, 2, 'consulta', 'Lembrete: Fisioterapia', 'Olá Maria! Sua sessão de fisioterapia amanhã às 10:00 com Dra. Andreia. Use roupas confortáveis.', '2026-02-23 18:00:00', 'enviado', 1, 1, 2, NOW()),
             (3, 3, 3, 'consulta', 'Lembrete: Retorno Ortopedia', 'Olá Pedro! Seu retorno com Dr. Pedro está confirmado para 14:00 de 24/02. Traga exames anteriores.', '2026-02-23 18:00:00', 'pendente', 1, 1, 3, NOW()),
