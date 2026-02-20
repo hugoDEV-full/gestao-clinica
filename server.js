@@ -1392,34 +1392,66 @@ app.get('/forgot-password', (req, res) => {
 
 app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     const emailRaw = req.body ? req.body.email : undefined;
+    const senhaRaw = req.body ? req.body.senha : undefined;
     const email = (emailRaw == null ? '' : String(emailRaw)).trim().toLowerCase();
+    const senha = (senhaRaw == null ? '' : String(senhaRaw));
     const ttlMinutes = Number(process.env.RESET_PASSWORD_TTL_MINUTES || 15);
 
     try {
         const db = getDB();
 
+        // Validar campos
+        if (!email || !senha) {
+            return res.render('forgot-password', {
+                error: 'Preencha email e senha para continuar.',
+                info: null
+            });
+        }
+
+        // Buscar usuário e verificar credenciais
         const [users] = await db.execute(
-            'SELECT id, email, nome, ativo, tipo FROM usuarios WHERE email = ? LIMIT 1',
+            'SELECT id, email, nome, ativo, tipo, senha FROM usuarios WHERE email = ? LIMIT 1',
             [email]
         );
         if (!users.length || !users[0] || !users[0].ativo) {
             return res.render('forgot-password', {
-                error: 'Não existe usuário ativo com esse e-mail.',
+                error: 'Email ou senha incorretos.',
                 info: null
             });
         }
 
         const user = users[0];
 
-        // Verificar se é admin - apenas admins podem resetar senha
+        // Verificar se é admin
         if (user.tipo !== 'admin') {
             console.warn(`[${nowLabel()}] TENTATIVA DE RESET DE SENHA - usuário não-admin: ${user.email} (${user.nome}) tipo: ${user.tipo}`);
             return res.render('forgot-password', {
-                error: 'Apenas administradores podem redefinir senhas. Entre em contato com o administrador do sistema.',
+                error: 'Apenas administradores podem redefinir senhas.',
                 info: null
             });
         }
 
+        // Verificar senha
+        const senhaBanco = user && user.senha != null ? String(user.senha) : '';
+        const pareceBcrypt = senhaBanco.startsWith('$2a$') || senhaBanco.startsWith('$2b$') || senhaBanco.startsWith('$2y$');
+        let senhaValida = false;
+        
+        if (pareceBcrypt) {
+            senhaValida = await bcrypt.compare(senha, senhaBanco);
+        } else {
+            // Compatibilidade: caso tenha sido salvo em texto puro (legado)
+            senhaValida = senha === senhaBanco;
+        }
+        
+        if (!senhaValida) {
+            console.warn(`[${nowLabel()}] TENTATIVA DE RESET DE SENHA - senha inválida: ${user.email}`);
+            return res.render('forgot-password', {
+                error: 'Email ou senha incorretos.',
+                info: null
+            });
+        }
+
+        // Autenticado com sucesso! Gerar código de redefinição
         const token = crypto.randomBytes(32).toString('hex');
         const code = generateResetCode();
         const tokenHash = sha256Hex(token);
@@ -1444,11 +1476,13 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         const baseUrl = await getAppBaseUrlFromConfig(db, req);
         const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}` : '';
 
+        console.log(`[${nowLabel()}] RESET DE SENHA AUTORIZADO - Admin: ${user.email} (${user.nome})`);
+
         // Sempre tentar SMTP primeiro
         const transporter = await getMailerTransporterFromConfig(db);
         
         if (!transporter) {
-            // Sem SMTP - mostrar código na tela com aviso
+            // Sem SMTP - mostrar código na tela
             console.error('❌ SMTP não configurado - variáveis:', {
                 EMAIL_HOST: process.env.EMAIL_HOST,
                 EMAIL_USER: process.env.EMAIL_USER,
@@ -1457,7 +1491,8 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             
             return res.render('forgot-password', {
                 error: null,
-                info: `📧 <strong>Redefinição de Senha</strong><br><br>
+                info: `🔐 <strong>Autenticado com sucesso!</strong><br><br>
+                       📧 <strong>Redefinição de Senha</strong><br><br>
                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
                            <strong>Código de Recuperação:</strong><br>
                            <span style="font-size: 1.5em; font-weight: bold; color: #007bff; font-family: monospace;">${code}</span><br>
@@ -1469,8 +1504,8 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
                            <a href="${resetLink}" style="word-break: break-all;">${resetLink}</a>
                        </div>
                        
-                       <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                           <small>💡 <strong>Como usar:</strong><br>
+                       <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                           <small>✅ <strong>Como usar:</strong><br>
                            1. Anote o código: <strong>${code}</strong><br>
                            2. Clique no link acima ou copie e cole no navegador<br>
                            3. Digite o código e sua nova senha</small>
@@ -1511,7 +1546,7 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             
             return res.render('forgot-password', {
                 error: null,
-                info: 'Email de redefinição enviado! Verifique sua caixa de entrada (e spam/promoções).',
+                info: '🔐 <strong>Autenticado com sucesso!</strong><br>Email de redefinição enviado! Verifique sua caixa de entrada (e spam/promoções).',
                 usuario: user,
                 currentPage: ''
             });
@@ -1521,7 +1556,7 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             
             return res.render('forgot-password', {
                 error: `Erro ao enviar email: ${emailError.message}`,
-                info: `Código de emergência: <strong>${code}</strong><br>Link: <a href="${resetLink}">${resetLink}</a>`,
+                info: `🔐 <strong>Autenticado!</strong><br>Código de emergência: <strong>${code}</strong><br>Link: <a href="${resetLink}">${resetLink}</a>`,
                 usuario: user,
                 currentPage: ''
             });
