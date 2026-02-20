@@ -1898,6 +1898,35 @@ app.get('/debug-smtp', async (req, res) => {
     }
 });
 
+// ROTA PARA VERIFICAR DADOS CRIADOS
+app.get('/verificar-dados', requireAuth, requireRoles(['admin']), async (req, res) => {
+    try {
+        const db = getDB();
+        
+        const [pacientes] = await db.execute('SELECT COUNT(*) as count FROM pacientes');
+        const [profissionais] = await db.execute('SELECT COUNT(*) as count FROM profissionais');
+        const [agendamentos] = await db.execute('SELECT COUNT(*) as count FROM agendamentos');
+        const [prontuarios] = await db.execute('SELECT COUNT(*) as count FROM prontuarios');
+        const [financeiro] = await db.execute('SELECT COUNT(*) as count FROM financeiro');
+        const [lembretes] = await db.execute('SELECT COUNT(*) as count FROM lembretes');
+        const [agenda] = await db.execute('SELECT COUNT(*) as count FROM agenda');
+        
+        res.json({
+            pacientes: pacientes[0].count,
+            profissionais: profissionais[0].count,
+            agendamentos: agendamentos[0].count,
+            prontuarios: prontuarios[0].count,
+            financeiro: financeiro[0].count,
+            lembretes: lembretes[0].count,
+            agenda: agenda[0].count,
+            total: pacientes[0].count + profissionais[0].count + agendamentos[0].count + prontuarios[0].count + financeiro[0].count + lembretes[0].count + agenda[0].count
+        });
+        
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ROTA PARA CARGA INICIAL MANUAL
 app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res) => {
     try {
@@ -1917,6 +1946,7 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             timezone: process.env.DB_TIMEZONE || '+00:00'
         };
         
+        console.log('📡 Conectando ao banco...', dbConfig.host);
         const connection = await mysql.createConnection(dbConfig);
         
         // Limpar dados existentes
@@ -1932,6 +1962,7 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
         
         for (const table of tables) {
             await connection.execute(`DELETE FROM ${table}`);
+            console.log(`✅ Tabela ${table} limpa`);
         }
         
         await connection.execute('SET FOREIGN_KEY_CHECKS = 1');
@@ -1939,17 +1970,18 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
 
         // Profissionais
         console.log('👨‍⚕️ Criando profissionais...');
-        await connection.execute(`
+        const [profResult] = await connection.execute(`
             INSERT INTO profissionais (id, nome, especialidade, crm, telefone, email, ativo, created_at) VALUES
             (1, 'Dr. Carlos Silva', 'Clínico Geral', 'CRM-DF 12345', '61982976481', 'carlos@clinica.com', 1, NOW()),
             (2, 'Dra. Andreia Ballejo', 'Fisioterapeuta', 'CREFITO 12345', '61982976482', 'andreia@clinica.com', 1, NOW()),
             (3, 'Dr. Pedro Oliveira', 'Ortopedista', 'CRM-DF 67890', '61982976483', 'pedro@clinica.com', 1, NOW()),
             (4, 'Dra. Maria Santos', 'Cardiologista', 'CRM-DF 11111', '61982976484', 'maria@clinica.com', 1, NOW())
         `);
+        console.log(`✅ ${profResult.affectedRows} profissionais criados`);
 
         // Pacientes
         console.log('👥 Criando pacientes...');
-        await connection.execute(`
+        const [pacResult] = await connection.execute(`
             INSERT INTO pacientes (id, nome, cpf, rg, data_nascimento, telefone, email, endereco, cidade, uf, cep, convenio, cartao_convenio, observacoes, ativo, created_at) VALUES
             (1, 'João da Silva', '12345678901', 'MG-12.345.678', '1985-03-15', '61982976481', 'joao.silva@email.com', 'Quadra 102 Norte, Bloco A, Apt 301', 'Brasília', 'DF', '70722-520', 'Unimed', '123456789', 'Alergico a penicilina', 1, NOW()),
             (2, 'Maria Oliveira', '98765432109', 'DF-98.765.432', '1990-07-22', '61982976485', 'maria.oliveira@email.com', 'SGAS 605, Conjunto D', 'Brasília', 'DF', '70200-660', 'Amil', '987654321', 'Hipertensa', 1, NOW()),
@@ -1957,10 +1989,11 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             (4, 'Ana Costa', '78912345601', 'BA-78.912.345', '1995-05-18', '61982976487', 'ana.costa@email.com', 'SIA Trecho 3, Lote 850', 'Brasília', 'DF', '71200-030', 'SulAmérica', '789123456', 'Nenhuma', 1, NOW()),
             (5, 'Carlos Ferreira', '32165498701', 'RJ-32.165.498', '1982-09-10', '61982976488', 'carlos.ferreira@email.com', 'EQS 406/407, Bloco A, Sala 101', 'Brasília', 'DF', '70630-000', 'Porto Seguro', '321654987', 'Asmático', 1, NOW())
         `);
+        console.log(`✅ ${pacResult.affectedRows} pacientes criados`);
 
         // Agenda
         console.log('📅 Criando agenda...');
-        await connection.execute(`
+        const [agendaResult] = await connection.execute(`
             INSERT INTO agenda (id, profissional_id, dia_semana, hora_inicio, hora_fim, intervalo_minutos, ativo, created_at) VALUES
             (1, 1, 2, '08:00:00', '18:00:00', 30, 1, NOW()),
             (2, 1, 3, '08:00:00', '18:00:00', 30, 1, NOW()),
@@ -1973,10 +2006,11 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             (9, 4, 2, '08:00:00', '16:00:00', 60, 1, NOW()),
             (10, 4, 4, '08:00:00', '16:00:00', 60, 1, NOW())
         `);
+        console.log(`✅ ${agendaResult.affectedRows} itens de agenda criados`);
 
         // Agendamentos
         console.log('📋 Criando agendamentos...');
-        await connection.execute(`
+        const [ageResult] = await connection.execute(`
             INSERT INTO agendamentos (id, paciente_id, profissional_id, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, created_at) VALUES
             (1, 1, 1, '2026-02-24 09:00:00', 30, 'consulta', 'confirmado', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
             (2, 2, 2, '2026-02-24 10:00:00', 40, 'avaliacao', 'confirmado', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
@@ -1987,10 +2021,11 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             (7, 2, 3, '2026-02-26 10:00:00', 45, 'avaliacao', 'agendado', 250.00, 'cartao', 'pendente', 'Amil', 'Avaliação ortopédica', 1, 1, NOW()),
             (8, 3, 4, '2026-02-26 11:00:00', 60, 'exame', 'agendado', 400.00, 'dinheiro', 'pendente', 'Bradesco', 'Teste de esforço', 1, 1, NOW())
         `);
+        console.log(`✅ ${ageResult.affectedRows} agendamentos criados`);
 
         // Prontuários
         console.log('🏥 Criando prontuários...');
-        await connection.execute(`
+        const [pronResult] = await connection.execute(`
             INSERT INTO prontuarios (id, paciente_id, profissional_id, data_abertura, queixa_principal, historico_doenca_atual, antecedentes_pessoais, antecedentes_familiares, hábitos_vida, alergias, medicamentos_em_uso, exames_realizados, hipotese_diagnostica, tratamento, evolucao, created_at) VALUES
             (1, 1, 1, '2026-01-15', 'Dor lombar crônica', 'Paciente refere dor na região lombar há 6 meses', 'Hipertensão controlada', 'Pai diabético', 'Sedentário, fumante (10 cigarros/dia)', 'Penicilina', 'Losartana 50mg/dia', 'RX coluna lombar', 'Hérnia de disco L4-L5', 'Fisioterapia + AINE', 'Paciente apresentando melhora da dor com fisioterapia', NOW()),
             (2, 2, 2, '2026-01-20', 'Limitação de movimento no ombro direito', 'Após queda da própria altura há 2 meses', 'Nenhum', 'Mãe com artrite reumatoide', 'Pratica natação 3x/semana', 'Nenhuma', 'Anticoncepcional', 'Ressonância magnética do ombro', 'Lesão do manguito rotador', 'Fisioterapia intensiva', 'Recuperação lenta mas progressiva', NOW()),
@@ -1998,10 +2033,11 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             (4, 4, 4, '2026-01-25', 'Palpitações', 'Episódios de taquicardia ao esforço', 'Nenhum', 'Pai com cardiopatia isquêmica', 'Corredora amadora', 'Nenhuma', 'Nenhum', 'ECG, Holter, Eco', 'Arritmia benigna', 'Beta-bloqueador se necessário', 'Exames normais, manter observação', NOW()),
             (5, 5, 1, '2026-02-01', 'Dor abdominal', 'Dor epigástrica pós-prandial', 'Asma leve', 'Nenhum', 'Ex-fumante', 'AAS', 'Salbutamol spray', 'Endoscopia digestiva', 'Gastrite leve', 'Omeprazol + dieta', 'Sintomas melhoraram com medicação', NOW())
         `);
+        console.log(`✅ ${pronResult.affectedRows} prontuários criados`);
 
         // Financeiro
         console.log('💰 Criando registros financeiros...');
-        await connection.execute(`
+        const [finResult] = await connection.execute(`
             INSERT INTO financeiro (id, paciente_id, profissional_id, agendamento_id, tipo, descricao, valor, forma_pagamento, status, data_vencimento, data_pagamento, parcelas, observacoes, created_at) VALUES
             (1, 1, 1, 1, 'receita', 'Consulta clínica', 200.00, 'dinheiro', 'pago', '2026-02-24', '2026-02-24', 1, 'Pago em dinheiro', NOW()),
             (2, 2, 2, 2, 'receita', 'Avaliação fisioterapia', 150.00, 'cartao', 'pago', '2026-02-24', '2026-02-24', 1, 'Cartão de crédito', NOW()),
@@ -2011,10 +2047,11 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             (6, NULL, NULL, NULL, 'despesa', 'Aluguel do consultório', 3000.00, 'transferencia', 'pago', '2026-02-01', '2026-02-01', 1, 'Aluguel fevereiro', NOW()),
             (7, NULL, NULL, NULL, 'despesa', 'Material de consumo', 450.00, 'dinheiro', 'pago', '2026-02-15', '2026-02-15', 1, 'Luvas, seringas, algodão', NOW())
         `);
+        console.log(`✅ ${finResult.affectedRows} registros financeiros criados`);
 
         // Lembretes
         console.log('⏰ Criando lembretes...');
-        await connection.execute(`
+        const [lemResult] = await connection.execute(`
             INSERT INTO lembretes (id, paciente_id, profissional_id, tipo, titulo, mensagem, data_envio, status, via_whatsapp, via_email, agenda_id, created_at) VALUES
             (1, 1, 1, 'consulta', 'Lembrete: Consulta Dr. Carlos', 'Olá João! Lembrete da sua consulta amanhã às 09:00 com Dr. Carlos Silva. Chegue 15 minutos antes.', '2026-02-23 18:00:00', 'enviado', 1, 1, 1, NOW()),
             (2, 2, 2, 'consulta', 'Lembrete: Fisioterapia', 'Olá Maria! Sua sessão de fisioterapia amanhã às 10:00 com Dra. Andreia. Use roupas confortáveis.', '2026-02-23 18:00:00', 'enviado', 1, 1, 2, NOW()),
@@ -2022,6 +2059,7 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             (4, 4, 4, 'consulta', 'Lembrete: Consulta Cardiologia', 'Olá Ana! Sua consulta cardiológica dia 24/02 às 15:00. Evite café antes do exame.', '2026-02-23 18:00:00', 'pendente', 1, 1, 4, NOW()),
             (5, 5, 1, 'consulta', 'Lembrete: Consulta Emergência', 'Olá Carlos! Sua consulta de emergência dia 25/02 às 08:30. Aguardamos você.', '2026-02-24 18:00:00', 'pendente', 1, 1, 5, NOW())
         `);
+        console.log(`✅ ${lemResult.affectedRows} lembretes criados`);
 
         // Configurações
         console.log('⚙️ Configurando sistema...');
@@ -2034,6 +2072,7 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             ('VALOR_CONSULTA_PADRAO', '200.00', 'Valor padrão da consulta', NOW())
             ON DUPLICATE KEY UPDATE valor = VALUES(valor)
         `);
+        console.log('✅ Configurações atualizadas');
 
         await connection.end();
 
@@ -2043,12 +2082,13 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
             success: true, 
             message: '✅ Carga inicial executada com sucesso!',
             data_created: {
-                pacientes: 5,
-                profissionais: 4,
-                agendamentos: 8,
-                prontuarios: 5,
-                financeiro: 7,
-                lembretes: 5
+                pacientes: pacResult.affectedRows,
+                profissionais: profResult.affectedRows,
+                agenda: agendaResult.affectedRows,
+                agendamentos: ageResult.affectedRows,
+                prontuarios: pronResult.affectedRows,
+                financeiro: finResult.affectedRows,
+                lembretes: lemResult.affectedRows
             }
         });
         
@@ -2056,7 +2096,8 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
         console.error('❌ Erro na carga inicial manual:', error);
         res.status(500).json({ 
             success: false, 
-            error: error.message 
+            error: error.message,
+            stack: error.stack
         });
     }
 });
