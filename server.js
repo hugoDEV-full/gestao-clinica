@@ -1399,7 +1399,7 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         const db = getDB();
 
         const [users] = await db.execute(
-            'SELECT id, email, nome, ativo FROM usuarios WHERE email = ? LIMIT 1',
+            'SELECT id, email, nome, ativo, tipo FROM usuarios WHERE email = ? LIMIT 1',
             [email]
         );
         if (!users.length || !users[0] || !users[0].ativo) {
@@ -1410,6 +1410,15 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         }
 
         const user = users[0];
+
+        // Verificar se é admin - apenas admins podem resetar senha
+        if (user.tipo !== 'admin') {
+            console.warn(`[${nowLabel()}] TENTATIVA DE RESET DE SENHA - usuário não-admin: ${user.email} (${user.nome}) tipo: ${user.tipo}`);
+            return res.render('forgot-password', {
+                error: 'Apenas administradores podem redefinir senhas. Entre em contato com o administrador do sistema.',
+                info: null
+            });
+        }
 
         const token = crypto.randomBytes(32).toString('hex');
         const code = generateResetCode();
