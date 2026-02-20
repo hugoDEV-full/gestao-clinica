@@ -2012,14 +2012,16 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
         console.log('📋 Criando agendamentos...');
         const [ageResult] = await connection.execute(`
             INSERT INTO agendamentos (id, paciente_id, profissional_id, paciente_nome, profissional_nome, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, data_cadastro) VALUES
-            (1, 1, 1, 'João da Silva', 'Dr. Carlos Silva', '2026-02-24 09:00:00', 30, 'consulta', 'confirmado', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
-            (2, 2, 2, 'Maria Oliveira', 'Dra. Andreia Ballejo', '2026-02-24 10:00:00', 40, 'avaliacao', 'confirmado', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
-            (3, 3, 3, 'Pedro Santos', 'Dr. Pedro Oliveira', '2026-02-24 14:00:00', 45, 'retorno', 'agendado', 250.00, 'pix', 'pendente', 'Bradesco', 'Retorno pós-cirurgia', 1, 1, NOW()),
-            (4, 4, 4, 'Ana Costa', 'Dra. Maria Santos', '2026-02-24 15:00:00', 60, 'consulta', 'agendado', 300.00, 'cartao', 'pendente', 'SulAmérica', 'Consulta de rotina', 1, 1, NOW()),
-            (5, 5, 1, 'Carlos Ferreira', 'Dr. Carlos Silva', '2026-02-25 08:30:00', 30, 'consulta', 'agendado', 200.00, 'dinheiro', 'pendente', 'Porto Seguro', 'Consulta de emergência', 1, 1, NOW()),
-            (6, 1, 2, 'João da Silva', 'Dra. Andreia Ballejo', '2026-02-25 14:00:00', 40, 'sessao', 'agendado', 150.00, 'pix', 'pendente', 'Unimed', 'Sessão de alongamento', 1, 1, NOW()),
-            (7, 2, 3, 'Maria Oliveira', 'Dr. Pedro Oliveira', '2026-02-26 10:00:00', 45, 'avaliacao', 'agendado', 250.00, 'cartao', 'pendente', 'Amil', 'Avaliação ortopédica', 1, 1, NOW()),
-            (8, 3, 4, 'Pedro Santos', 'Dra. Maria Santos', '2026-02-26 11:00:00', 60, 'exame', 'agendado', 400.00, 'dinheiro', 'pendente', 'Bradesco', 'Teste de esforço', 1, 1, NOW())
+            (1, 1, 1, 'João da Silva', 'Dr. Carlos Silva', '2026-02-20 09:00:00', 30, 'consulta', 'concluido', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
+            (2, 2, 2, 'Maria Oliveira', 'Dra. Andreia Ballejo', '2026-02-19 10:00:00', 40, 'avaliacao', 'concluido', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
+            (3, 3, 3, 'Pedro Santos', 'Dr. Pedro Oliveira', '2026-02-18 14:00:00', 45, 'retorno', 'concluido', 250.00, 'pix', 'pago', 'Bradesco', 'Retorno pós-cirurgia', 1, 1, NOW()),
+            (4, 4, 4, 'Ana Costa', 'Dra. Maria Santos', '2026-02-17 15:00:00', 60, 'consulta', 'concluido', 300.00, 'cartao', 'pago', 'SulAmérica', 'Consulta de rotina', 1, 1, NOW()),
+            (5, 5, 1, 'Carlos Ferreira', 'Dr. Carlos Silva', '2026-02-16 08:30:00', 30, 'consulta', 'concluido', 200.00, 'dinheiro', 'pago', 'Porto Seguro', 'Consulta de emergência', 1, 1, NOW()),
+            (6, 1, 2, 'João da Silva', 'Dra. Andreia Ballejo', '2026-02-24 14:00:00', 40, 'sessao', 'agendado', 150.00, 'pix', 'pendente', 'Unimed', 'Sessão de alongamento', 1, 1, NOW()),
+            (7, 2, 3, 'Maria Oliveira', 'Dr. Pedro Oliveira', '2026-02-24 15:00:00', 45, 'avaliacao', 'agendado', 250.00, 'cartao', 'pendente', 'Amil', 'Avaliação ortopédica', 1, 1, NOW()),
+            (8, 3, 4, 'Pedro Santos', 'Dra. Maria Santos', '2026-02-25 09:00:00', 60, 'exame', 'agendado', 400.00, 'dinheiro', 'pendente', 'Bradesco', 'Teste de esforço', 1, 1, NOW()),
+            (9, 4, 1, 'Ana Costa', 'Dr. Carlos Silva', '2026-02-25 10:00:00', 30, 'consulta', 'agendado', 200.00, 'dinheiro', 'pendente', 'SulAmérica', 'Consulta de retorno', 1, 1, NOW()),
+            (10, 5, 2, 'Carlos Ferreira', 'Dra. Andreia Ballejo', '2026-02-25 11:00:00', 40, 'sessao', 'agendado', 180.00, 'pix', 'pendente', 'Porto Seguro', 'Sessão de fisioterapia', 1, 1, NOW())
         `);
         console.log(`✅ ${ageResult.affectedRows} agendamentos criados`);
 
@@ -2038,14 +2040,17 @@ app.post('/carga-inicial', requireAuth, requireRoles(['admin']), async (req, res
         // Financeiro
         console.log('💰 Criando registros financeiros...');
         const [finResult] = await connection.execute(`
-            INSERT INTO financeiro (id, paciente_id, profissional_id, agendamento_id, tipo, descricao, valor, forma_pagamento, status, data_vencimento, data_pagamento, parcelas, observacoes, created_at) VALUES
-            (1, 1, 1, 1, 'receita', 'Consulta clínica', 200.00, 'dinheiro', 'pago', '2026-02-24', '2026-02-24', 1, 'Pago em dinheiro', NOW()),
-            (2, 2, 2, 2, 'receita', 'Avaliação fisioterapia', 150.00, 'cartao', 'pago', '2026-02-24', '2026-02-24', 1, 'Cartão de crédito', NOW()),
-            (3, 3, 3, 3, 'receita', 'Retorno ortopédico', 250.00, 'pix', 'pendente', '2026-02-24', NULL, 1, 'Aguardando pagamento', NOW()),
-            (4, 4, 4, 4, 'receita', 'Consulta cardiológica', 300.00, 'cartao', 'pendente', '2026-02-24', NULL, 1, 'Pagamento no dia da consulta', NOW()),
-            (5, 5, 1, 5, 'receita', 'Consulta de emergência', 200.00, 'dinheiro', 'pendente', '2026-02-25', NULL, 1, 'Pagar no local', NOW()),
-            (6, NULL, NULL, NULL, 'despesa', 'Aluguel do consultório', 3000.00, 'transferencia', 'pago', '2026-02-01', '2026-02-01', 1, 'Aluguel fevereiro', NOW()),
-            (7, NULL, NULL, NULL, 'despesa', 'Material de consumo', 450.00, 'dinheiro', 'pago', '2026-02-15', '2026-02-15', 1, 'Luvas, seringas, algodão', NOW())
+            INSERT INTO financeiro (id, paciente_id, profissional_id, agendamento_id, tipo, descricao, valor, forma_pagamento, status, data_vencimento, data_pagamento, parcelas, observacoes, data_cadastro) VALUES
+            (1, 1, 1, 1, 'receita', 'Consulta clínica - João Silva', 200.00, 'dinheiro', 'pago', '2026-02-20', '2026-02-20', 1, 'Pago em dinheiro', NOW()),
+            (2, 2, 2, 2, 'receita', 'Avaliação fisioterapia - Maria Oliveira', 150.00, 'cartao', 'pago', '2026-02-19', '2026-02-19', 1, 'Cartão de crédito', NOW()),
+            (3, 3, 3, 3, 'receita', 'Retorno ortopédico - Pedro Santos', 250.00, 'pix', 'pago', '2026-02-18', '2026-02-18', 1, 'Pago via PIX', NOW()),
+            (4, 4, 4, 4, 'receita', 'Consulta cardiológica - Ana Costa', 300.00, 'cartao', 'pago', '2026-02-17', '2026-02-17', 1, 'Cartão de crédito', NOW()),
+            (5, 5, 1, 5, 'receita', 'Consulta emergência - Carlos Ferreira', 200.00, 'dinheiro', 'pago', '2026-02-16', '2026-02-16', 1, 'Pago em dinheiro', NOW()),
+            (6, 6, 2, 6, 'receita', 'Sessão fisioterapia - João Silva', 150.00, 'pix', 'pendente', '2026-02-24', NULL, 1, 'Aguardando pagamento', NOW()),
+            (7, 7, 3, 7, 'receita', 'Avaliação ortopédica - Maria Oliveira', 250.00, 'cartao', 'pendente', '2026-02-24', NULL, 1, 'Pagamento no dia', NOW()),
+            (8, 8, 4, 8, 'receita', 'Teste esforço - Pedro Santos', 400.00, 'dinheiro', 'pendente', '2026-02-25', NULL, 1, 'Pagar no local', NOW()),
+            (9, NULL, NULL, NULL, 'despesa', 'Aluguel do consultório', 3000.00, 'transferencia', 'pago', '2026-02-01', '2026-02-01', 1, 'Aluguel fevereiro', NOW()),
+            (10, NULL, NULL, NULL, 'despesa', 'Material de consumo', 450.00, 'dinheiro', 'pago', '2026-02-15', '2026-02-15', 1, 'Luvas, seringas, algodão', NOW())
         `);
         console.log(`✅ ${finResult.affectedRows} registros financeiros criados`);
 

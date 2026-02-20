@@ -224,14 +224,16 @@ async function carregarDadosIniciais() {
     console.log('📅 Criando agendamentos...');
     await connection.execute(`
       INSERT INTO agendamentos (id, paciente_id, profissional_id, paciente_nome, profissional_nome, data_hora, duracao_minutos, tipo_consulta, status, valor, forma_pagamento, status_pagamento, convenio, observacoes, enviar_lembrete, confirmar_whatsapp, data_cadastro) VALUES
-      (1, 1, 1, 'João da Silva', 'Dr. Carlos Silva', '2026-02-24 09:00:00', 30, 'consulta', 'confirmado', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
-      (2, 2, 2, 'Maria Oliveira', 'Dra. Andreia Ballejo', '2026-02-24 10:00:00', 40, 'avaliacao', 'confirmado', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
-      (3, 3, 3, 'Pedro Santos', 'Dr. Pedro Oliveira', '2026-02-24 14:00:00', 45, 'retorno', 'agendado', 250.00, 'pix', 'pendente', 'Bradesco', 'Retorno pós-cirurgia', 1, 1, NOW()),
-      (4, 4, 4, 'Ana Costa', 'Dra. Maria Santos', '2026-02-24 15:00:00', 60, 'consulta', 'agendado', 300.00, 'cartao', 'pendente', 'SulAmérica', 'Consulta de rotina', 1, 1, NOW()),
-      (5, 5, 1, 'Carlos Ferreira', 'Dr. Carlos Silva', '2026-02-25 08:30:00', 30, 'consulta', 'agendado', 200.00, 'dinheiro', 'pendente', 'Porto Seguro', 'Consulta de emergência', 1, 1, NOW()),
-      (6, 1, 2, 'João da Silva', 'Dra. Andreia Ballejo', '2026-02-25 14:00:00', 40, 'sessao', 'agendado', 150.00, 'pix', 'pendente', 'Unimed', 'Sessão de alongamento', 1, 1, NOW()),
-      (7, 2, 3, 'Maria Oliveira', 'Dr. Pedro Oliveira', '2026-02-26 10:00:00', 45, 'avaliacao', 'agendado', 250.00, 'cartao', 'pendente', 'Amil', 'Avaliação ortopédica', 1, 1, NOW()),
-      (8, 3, 4, 'Pedro Santos', 'Dra. Maria Santos', '2026-02-26 11:00:00', 60, 'exame', 'agendado', 400.00, 'dinheiro', 'pendente', 'Bradesco', 'Teste de esforço', 1, 1, NOW())
+      (1, 1, 1, 'João da Silva', 'Dr. Carlos Silva', '2026-02-20 09:00:00', 30, 'consulta', 'concluido', 200.00, 'dinheiro', 'pago', 'Unimed', 'Paciente retorna para acompanhamento', 1, 1, NOW()),
+      (2, 2, 2, 'Maria Oliveira', 'Dra. Andreia Ballejo', '2026-02-19 10:00:00', 40, 'avaliacao', 'concluido', 150.00, 'cartao', 'pago', 'Amil', 'Primeira sessão de fisioterapia', 1, 1, NOW()),
+      (3, 3, 3, 'Pedro Santos', 'Dr. Pedro Oliveira', '2026-02-18 14:00:00', 45, 'retorno', 'concluido', 250.00, 'pix', 'pago', 'Bradesco', 'Retorno pós-cirurgia', 1, 1, NOW()),
+      (4, 4, 4, 'Ana Costa', 'Dra. Maria Santos', '2026-02-17 15:00:00', 60, 'consulta', 'concluido', 300.00, 'cartao', 'pago', 'SulAmérica', 'Consulta de rotina', 1, 1, NOW()),
+      (5, 5, 1, 'Carlos Ferreira', 'Dr. Carlos Silva', '2026-02-16 08:30:00', 30, 'consulta', 'concluido', 200.00, 'dinheiro', 'pago', 'Porto Seguro', 'Consulta de emergência', 1, 1, NOW()),
+      (6, 1, 2, 'João da Silva', 'Dra. Andreia Ballejo', '2026-02-24 14:00:00', 40, 'sessao', 'agendado', 150.00, 'pix', 'pendente', 'Unimed', 'Sessão de alongamento', 1, 1, NOW()),
+      (7, 2, 3, 'Maria Oliveira', 'Dr. Pedro Oliveira', '2026-02-24 15:00:00', 45, 'avaliacao', 'agendado', 250.00, 'cartao', 'pendente', 'Amil', 'Avaliação ortopédica', 1, 1, NOW()),
+      (8, 3, 4, 'Pedro Santos', 'Dra. Maria Santos', '2026-02-25 09:00:00', 60, 'exame', 'agendado', 400.00, 'dinheiro', 'pendente', 'Bradesco', 'Teste de esforço', 1, 1, NOW()),
+      (9, 4, 1, 'Ana Costa', 'Dr. Carlos Silva', '2026-02-25 10:00:00', 30, 'consulta', 'agendado', 200.00, 'dinheiro', 'pendente', 'SulAmérica', 'Consulta de retorno', 1, 1, NOW()),
+      (10, 5, 2, 'Carlos Ferreira', 'Dra. Andreia Ballejo', '2026-02-25 11:00:00', 40, 'sessao', 'agendado', 180.00, 'pix', 'pendente', 'Porto Seguro', 'Sessão de fisioterapia', 1, 1, NOW())
     `);
 
     // 5. Prontuários
