@@ -1393,65 +1393,106 @@ app.get('/forgot-password', (req, res) => {
 app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     const emailRaw = req.body ? req.body.email : undefined;
     const senhaRaw = req.body ? req.body.senha : undefined;
+    const targetEmailRaw = req.body ? req.body.targetEmail : undefined;
     const email = (emailRaw == null ? '' : String(emailRaw)).trim().toLowerCase();
     const senha = (senhaRaw == null ? '' : String(senhaRaw));
+    const targetEmail = (targetEmailRaw == null ? '' : String(targetEmailRaw).trim().toLowerCase());
     const ttlMinutes = Number(process.env.RESET_PASSWORD_TTL_MINUTES || 15);
 
     try {
         const db = getDB();
 
-        // Validar campos
-        if (!email || !senha) {
+        // Etapa 1: Autenticação do admin
+        if (!targetEmail) {
+            // Validar campos de autenticação
+            if (!email || !senha) {
+                return res.render('forgot-password', {
+                    error: 'Preencha email e senha do administrador para continuar.',
+                    info: null,
+                    showTargetEmail: false
+                });
+            }
+
+            // Buscar usuário admin e verificar credenciais
+            const [users] = await db.execute(
+                'SELECT id, email, nome, ativo, tipo, senha FROM usuarios WHERE email = ? LIMIT 1',
+                [email]
+            );
+            if (!users.length || !users[0] || !users[0].ativo) {
+                return res.render('forgot-password', {
+                    error: 'Email ou senha incorretos.',
+                    info: null,
+                    showTargetEmail: false
+                });
+            }
+
+            const user = users[0];
+
+            // Verificar se é admin
+            if (user.tipo !== 'admin') {
+                console.warn(`[${nowLabel()}] TENTATIVA DE RESET DE SENHA - usuário não-admin: ${user.email} (${user.nome}) tipo: ${user.tipo}`);
+                return res.render('forgot-password', {
+                    error: 'Apenas administradores podem redefinir senhas.',
+                    info: null,
+                    showTargetEmail: false
+                });
+            }
+
+            // Verificar senha
+            const senhaBanco = user && user.senha != null ? String(user.senha) : '';
+            const pareceBcrypt = senhaBanco.startsWith('$2a$') || senhaBanco.startsWith('$2b$') || senhaBanco.startsWith('$2y$');
+            let senhaValida = false;
+            
+            if (pareceBcrypt) {
+                senhaValida = await bcrypt.compare(senha, senhaBanco);
+            } else {
+                senhaValida = senha === senhaBanco;
+            }
+            
+            if (!senhaValida) {
+                console.warn(`[${nowLabel()}] TENTATIVA DE RESET DE SENHA - senha inválida: ${user.email}`);
+                return res.render('forgot-password', {
+                    error: 'Email ou senha incorretos.',
+                    info: null,
+                    showTargetEmail: false
+                });
+            }
+
+            // Admin autenticado! Mostrar etapa 2
             return res.render('forgot-password', {
-                error: 'Preencha email e senha para continuar.',
-                info: null
+                error: null,
+                info: `🔐 <strong>Autenticado como admin!</strong><br><br>Agora escolha o email que deseja redefinir a senha:`,
+                adminEmail: user.email,
+                adminName: user.nome,
+                showTargetEmail: true
             });
         }
 
-        // Buscar usuário e verificar credenciais
-        const [users] = await db.execute(
-            'SELECT id, email, nome, ativo, tipo, senha FROM usuarios WHERE email = ? LIMIT 1',
-            [email]
+        // Etapa 2: Resetar senha do email escolhido
+        if (!targetEmail) {
+            return res.render('forgot-password', {
+                error: 'Escolha um email para redefinir a senha.',
+                info: null,
+                showTargetEmail: true
+            });
+        }
+
+        // Buscar usuário alvo
+        const [targetUsers] = await db.execute(
+            'SELECT id, email, nome, ativo, tipo FROM usuarios WHERE email = ? LIMIT 1',
+            [targetEmail]
         );
-        if (!users.length || !users[0] || !users[0].ativo) {
+        if (!targetUsers.length || !targetUsers[0] || !targetUsers[0].ativo) {
             return res.render('forgot-password', {
-                error: 'Email ou senha incorretos.',
-                info: null
+                error: 'Não existe usuário ativo com esse e-mail.',
+                info: null,
+                showTargetEmail: true
             });
         }
 
-        const user = users[0];
+        const targetUser = targetUsers[0];
 
-        // Verificar se é admin
-        if (user.tipo !== 'admin') {
-            console.warn(`[${nowLabel()}] TENTATIVA DE RESET DE SENHA - usuário não-admin: ${user.email} (${user.nome}) tipo: ${user.tipo}`);
-            return res.render('forgot-password', {
-                error: 'Apenas administradores podem redefinir senhas.',
-                info: null
-            });
-        }
-
-        // Verificar senha
-        const senhaBanco = user && user.senha != null ? String(user.senha) : '';
-        const pareceBcrypt = senhaBanco.startsWith('$2a$') || senhaBanco.startsWith('$2b$') || senhaBanco.startsWith('$2y$');
-        let senhaValida = false;
-        
-        if (pareceBcrypt) {
-            senhaValida = await bcrypt.compare(senha, senhaBanco);
-        } else {
-            // Compatibilidade: caso tenha sido salvo em texto puro (legado)
-            senhaValida = senha === senhaBanco;
-        }
-        
-        if (!senhaValida) {
-            console.warn(`[${nowLabel()}] TENTATIVA DE RESET DE SENHA - senha inválida: ${user.email}`);
-            return res.render('forgot-password', {
-                error: 'Email ou senha incorretos.',
-                info: null
-            });
-        }
-
-        // Autenticado com sucesso! Gerar código de redefinição
+        // Gerar código de redefinição
         const token = crypto.randomBytes(32).toString('hex');
         const code = generateResetCode();
         const tokenHash = sha256Hex(token);
@@ -1463,8 +1504,8 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
              VALUES
                 (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NULL, NOW(), ?, ?)`,
             [
-                user.id,
-                user.email,
+                targetUser.id,
+                targetUser.email,
                 tokenHash,
                 codeHash,
                 ttlMinutes,
@@ -1474,25 +1515,19 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         );
 
         const baseUrl = await getAppBaseUrlFromConfig(db, req);
-        const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}` : '';
+        const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(targetUser.email)}` : '';
 
-        console.log(`[${nowLabel()}] RESET DE SENHA AUTORIZADO - Admin: ${user.email} (${user.nome})`);
+        console.log(`[${nowLabel()}] RESET DE SENHA AUTORIZADO - Admin: ${email} → Alvo: ${targetUser.email} (${targetUser.nome})`);
 
         // Sempre tentar SMTP primeiro
         const transporter = await getMailerTransporterFromConfig(db);
         
         if (!transporter) {
             // Sem SMTP - mostrar código na tela
-            console.error('❌ SMTP não configurado - variáveis:', {
-                EMAIL_HOST: process.env.EMAIL_HOST,
-                EMAIL_USER: process.env.EMAIL_USER,
-                EMAIL_PASS: process.env.EMAIL_PASS ? 'SIM' : 'NÃO'
-            });
-            
             return res.render('forgot-password', {
                 error: null,
-                info: `🔐 <strong>Autenticado com sucesso!</strong><br><br>
-                       📧 <strong>Redefinição de Senha</strong><br><br>
+                info: `🔐 <strong>Admin autenticado!</strong><br><br>
+                       📧 <strong>Redefinição para: ${targetUser.nome} (${targetUser.email})</strong><br><br>
                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
                            <strong>Código de Recuperação:</strong><br>
                            <span style="font-size: 1.5em; font-weight: bold; color: #007bff; font-family: monospace;">${code}</span><br>
@@ -1508,10 +1543,9 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
                            <small>✅ <strong>Como usar:</strong><br>
                            1. Anote o código: <strong>${code}</strong><br>
                            2. Clique no link acima ou copie e cole no navegador<br>
-                           3. Digite o código e sua nova senha</small>
+                           3. Digite o código e a nova senha do usuário</small>
                        </div>`,
-                usuario: user,
-                currentPage: ''
+                showTargetEmail: false
             });
         }
 
@@ -1522,33 +1556,32 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             : (process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
 
         const subject = 'Redefinição de Senha - Clínica Andreia Ballejo';
-        const text = `Olá ${user.nome},\n\nRecebemos uma solicitação para redefinir sua senha.\n\nCódigo: ${code}\nLink: ${resetLink}\n\nEste código expira em ${ttlMinutes} minutos.\n\nSe não solicitou, ignore este email.`;
+        const text = `Olá ${targetUser.nome},\n\nO administrador redefiniu sua senha.\n\nCódigo: ${code}\nLink: ${resetLink}\n\nEste código expira em ${ttlMinutes} minutos.\n\nSe não solicitou, entre em contato com o administrador.`;
         const html = `
             <h2>Redefinição de Senha</h2>
-            <p>Olá <strong>${user.nome}</strong>,</p>
-            <p>Recebemos uma solicitação para redefinir sua senha.</p>
+            <p>Olá <strong>${targetUser.nome}</strong>,</p>
+            <p>O administrador redefiniu sua senha.</p>
             <p><strong>Código:</strong> <code style="font-size: 1.2em; background: #f0f0f0; padding: 5px;">${code}</code></p>
             <p><a href="${resetLink}">Clique aqui para redefinir</a></p>
             <p><small>Válido por ${ttlMinutes} minutos.</small></p>
-            <p><em>Se não solicitou, ignore este email.</em></p>
+            <p><em>Se não solicitou, entre em contato com o administrador.</em></p>
         `;
 
         try {
             await transporter.sendMail({
                 from,
-                to: user.email,
+                to: targetUser.email,
                 subject,
                 text,
                 html
             });
             
-            console.log('✅ Email enviado com sucesso para:', user.email);
+            console.log('✅ Email enviado com sucesso para:', targetUser.email);
             
             return res.render('forgot-password', {
                 error: null,
-                info: '🔐 <strong>Autenticado com sucesso!</strong><br>Email de redefinição enviado! Verifique sua caixa de entrada (e spam/promoções).',
-                usuario: user,
-                currentPage: ''
+                info: `🔐 <strong>Admin autenticado!</strong><br>📧 Email de redefinição enviado para <strong>${targetUser.nome} (${targetUser.email})</strong>! Verifique a caixa de entrada.`,
+                showTargetEmail: false
             });
             
         } catch (emailError) {
@@ -1556,15 +1589,18 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             
             return res.render('forgot-password', {
                 error: `Erro ao enviar email: ${emailError.message}`,
-                info: `🔐 <strong>Autenticado!</strong><br>Código de emergência: <strong>${code}</strong><br>Link: <a href="${resetLink}">${resetLink}</a>`,
-                usuario: user,
-                currentPage: ''
+                info: `🔐 <strong>Admin autenticado!</strong><br>Código de emergência para <strong>${targetUser.email}</strong>: <strong>${code}</strong><br>Link: <a href="${resetLink}">${resetLink}</a>`,
+                showTargetEmail: false
             });
         }
 
     } catch (e) {
         console.error('Erro no forgot-password:', e);
-        return res.render('forgot-password', { error: 'Não foi possível processar a solicitação agora. Tente novamente.', info: null });
+        return res.render('forgot-password', { 
+            error: 'Não foi possível processar a solicitação agora. Tente novamente.', 
+            info: null,
+            showTargetEmail: false 
+        });
     }
 });
 
