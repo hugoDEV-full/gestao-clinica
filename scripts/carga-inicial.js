@@ -46,11 +46,11 @@ async function carregarDadosIniciais() {
         // 2. Profissionais (Médicos)
         console.log('👨‍⚕️ Criando profissionais...');
         await connection.execute(`
-            INSERT INTO profissionais (id, nome, especialidade, registro_profissional, telefone, email, ativo, created_at) VALUES
-            (1, 'Dr. Carlos Silva', 'Clínico Geral', 'CRM-DF 12345', '61982976481', 'carlos@clinica.com', 1, NOW()),
-            (2, 'Dra. Andreia Ballejo', 'Fisioterapeuta', 'CREFITO 12345', '61982976482', 'andreia@clinica.com', 1, NOW()),
-            (3, 'Dr. Pedro Oliveira', 'Ortopedista', 'CRM-DF 67890', '61982976483', 'pedro@clinica.com', 1, NOW()),
-            (4, 'Dra. Maria Santos', 'Cardiologista', 'CRM-DF 11111', '61982976484', 'maria@clinica.com', 1, NOW())
+            INSERT INTO profissionais (id, nome, especialidade, registro_profissional, telefone, email, ativo) VALUES
+            (1, 'Dr. Carlos Silva', 'Clínico Geral', 'CRM-DF 12345', '61982976481', 'carlos@clinica.com', 1),
+            (2, 'Dra. Andreia Ballejo', 'Fisioterapeuta', 'CREFITO 12345', '61982976482', 'andreia@clinica.com', 1),
+            (3, 'Dr. Pedro Oliveira', 'Ortopedista', 'CRM-DF 67890', '61982976483', 'pedro@clinica.com', 1),
+            (4, 'Dra. Maria Santos', 'Cardiologista', 'CRM-DF 11111', '61982976484', 'maria@clinica.com', 1)
         `);
 
         // 3. Pacientes
