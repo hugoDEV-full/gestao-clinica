@@ -202,7 +202,7 @@ async function carregarDadosIniciais() {
     // 1. Profissionais
     console.log('👨‍⚕️ Criando profissionais...');
     await connection.execute(`
-      INSERT INTO profissionais (id, nome, especialidade, crm, telefone, email, ativo, created_at) VALUES
+      INSERT INTO profissionais (id, nome, especialidade, registro_profissional, telefone, email, ativo, created_at) VALUES
       (1, 'Dr. Carlos Silva', 'Clínico Geral', 'CRM-DF 12345', '61982976481', 'carlos@clinica.com', 1, NOW()),
       (2, 'Dra. Andreia Ballejo', 'Fisioterapeuta', 'CREFITO 12345', '61982976482', 'andreia@clinica.com', 1, NOW()),
       (3, 'Dr. Pedro Oliveira', 'Ortopedista', 'CRM-DF 67890', '61982976483', 'pedro@clinica.com', 1, NOW()),
