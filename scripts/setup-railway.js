@@ -264,11 +264,18 @@ async function carregarDadosIniciais() {
     console.log('⏰ Criando lembretes...');
     await connection.execute(`
       INSERT INTO lembretes (id, paciente_id, profissional_id, tipo, titulo, mensagem, data_envio, status, via_whatsapp, via_email, agenda_id, data_cadastro) VALUES
-      (1, 1, 1, 'consulta', 'Lembrete: Consulta Dr. Carlos', 'Olá João! Lembrete da sua consulta amanhã às 09:00 com Dr. Carlos Silva. Chegue 15 minutos antes.', '2026-02-23 18:00:00', 'enviado', 1, 1, 1, NOW()),
-      (2, 2, 2, 'consulta', 'Lembrete: Fisioterapia', 'Olá Maria! Sua sessão de fisioterapia amanhã às 10:00 com Dra. Andreia. Use roupas confortáveis.', '2026-02-23 18:00:00', 'enviado', 1, 1, 2, NOW()),
-      (3, 3, 3, 'consulta', 'Lembrete: Retorno Ortopedia', 'Olá Pedro! Seu retorno com Dr. Pedro está confirmado para 14:00 de 24/02. Traga exames anteriores.', '2026-02-23 18:00:00', 'pendente', 1, 1, 3, NOW()),
-      (4, 4, 4, 'consulta', 'Lembrete: Consulta Cardiologia', 'Olá Ana! Sua consulta cardiológica dia 24/02 às 15:00. Evite café antes do exame.', '2026-02-23 18:00:00', 'pendente', 1, 1, 4, NOW()),
-      (5, 5, 1, 'consulta', 'Lembrete: Consulta Emergência', 'Olá Carlos! Sua consulta de emergência dia 25/02 às 08:30. Aguardamos você.', '2026-02-24 18:00:00', 'pendente', 1, 1, 5, NOW())
+      -- Consultas passadas (enviados)
+      (1, 1, 1, 'consulta', 'Lembrete: Consulta Dr. Carlos', 'Olá João! Lembrete da sua consulta amanhã às 09:00 com Dr. Carlos Silva. Chegue 15 minutos antes.', '2026-02-19 18:00:00', 'enviado', 1, 1, 1, NOW()),
+      (2, 2, 2, 'consulta', 'Lembrete: Fisioterapia', 'Olá Maria! Sua sessão de fisioterapia amanhã às 10:00 com Dra. Andreia. Use roupas confortáveis.', '2026-02-18 18:00:00', 'enviado', 1, 1, 2, NOW()),
+      (3, 3, 3, 'consulta', 'Lembrete: Retorno Ortopedia', 'Olá Pedro! Seu retorno com Dr. Pedro está confirmado para 14:00. Traga exames anteriores.', '2026-02-17 18:00:00', 'enviado', 1, 1, 3, NOW()),
+      (4, 4, 4, 'consulta', 'Lembrete: Consulta Cardiologia', 'Olá Ana! Sua consulta cardiológica amanhã às 15:00. Evite café antes do exame.', '2026-02-16 18:00:00', 'enviado', 1, 1, 4, NOW()),
+      (5, 5, 1, 'consulta', 'Lembrete: Consulta Emergência', 'Olá Carlos! Sua consulta de emergência amanhã às 08:30. Aguardamos você.', '2026-02-15 18:00:00', 'enviado', 1, 1, 5, NOW()),
+      -- Consultas futuras (pendentes)
+      (6, 1, 2, 'consulta', 'Lembrete: Sessão Fisioterapia', 'Olá João! Sua sessão de fisioterapia dia 24/02 às 14:00 com Dra. Andreia. Use roupas confortáveis.', '2026-02-23 18:00:00', 'pendente', 1, 1, 6, NOW()),
+      (7, 2, 3, 'consulta', 'Lembrete: Avaliação Ortopédica', 'Olá Maria! Sua avaliação ortopédica dia 24/02 às 15:00 com Dr. Pedro. Traga exames anteriores.', '2026-02-23 18:00:00', 'pendente', 1, 1, 7, NOW()),
+      (8, 3, 4, 'consulta', 'Lembrete: Teste de Esforço', 'Olá Pedro! Seu teste de esforço dia 25/02 às 09:00 com Dra. Maria. Use roupas adequadas para exercício.', '2026-02-24 18:00:00', 'pendente', 1, 1, 8, NOW()),
+      (9, 4, 1, 'consulta', 'Lembrete: Consulta Retorno', 'Olá Ana! Sua consulta de retorno dia 25/02 às 10:00 com Dr. Carlos. Traza seus exames recentes.', '2026-02-24 18:00:00', 'pendente', 1, 1, 9, NOW()),
+      (10, 5, 2, 'consulta', 'Lembrete: Sessão Fisioterapia', 'Olá Carlos! Sua sessão de fisioterapia dia 25/02 às 11:00 com Dra. Andreia. Chegue 10 minutos antes.', '2026-02-24 18:00:00', 'pendente', 1, 1, 10, NOW())
     `);
 
     // 8. Configurações
