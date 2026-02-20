@@ -540,10 +540,13 @@ async function processarLembretesPendentes() {
         const retryMinutes = Number(process.env.REMINDER_RETRY_INTERVAL_MINUTES || 5);
         const maxAttempts = Number(process.env.REMINDER_MAX_ATTEMPTS || 20);
         const [rows] = await db.execute(
-            `SELECT l.id, l.mensagem, l.via_whatsapp, l.status, l.data_envio, l.tentativas,
-                    p.telefone AS paciente_telefone
+            `SELECT l.id, l.mensagem, l.via_whatsapp, l.via_email, l.status, l.data_envio, l.tentativas,
+                    p.telefone AS paciente_telefone, p.email AS paciente_email, p.nome AS paciente_nome,
+                    a.data_hora, a.duracao_minutos, a.tipo_consulta, prof.nome AS profissional_nome
              FROM lembretes l
              LEFT JOIN pacientes p ON p.id = l.paciente_id
+             LEFT JOIN agenda a ON a.id = l.agenda_id
+             LEFT JOIN profissionais prof ON prof.id = l.profissional_id
              WHERE l.status = 'pendente'
                AND l.data_envio IS NOT NULL
                AND l.data_envio <= NOW()
@@ -555,30 +558,67 @@ async function processarLembretesPendentes() {
 
         const status = whatsappService.getStatus();
         const canSendWhats = status && status.isConnected;
+        const transporter = await getMailerTransporterFromConfig(db);
 
         for (const r of rows) {
-            if (!r.via_whatsapp) continue;
-            if (!canSendWhats) continue;
+            let whatsappEnviado = false;
+            let emailEnviado = false;
 
-            if (!r.paciente_telefone) {
-                await db.execute(
-                    "UPDATE lembretes SET status = 'erro', data_envio_real = NOW() WHERE id = ?",
-                    [r.id]
-                );
-                continue;
+            // Enviar WhatsApp
+            if (r.via_whatsapp && canSendWhats && r.paciente_telefone) {
+                try {
+                    await whatsappService.sendMessage(r.paciente_telefone, r.mensagem || 'Lembrete');
+                    await db.execute(
+                        "UPDATE lembretes SET status = 'enviado', data_envio_real = NOW() WHERE id = ?",
+                        [r.id]
+                    );
+                    whatsappEnviado = true;
+                } catch (sendErr) {
+                    const attempts = Number(r.tentativas || 0) + 1;
+                    const errMsg = sendErr && sendErr.message ? String(sendErr.message).slice(0, 250) : 'Erro ao enviar';
+                    console.error('Falha ao enviar lembrete WhatsApp:', r.id, errMsg, `tentativa ${attempts}/${maxAttempts}`);
+                }
             }
 
-            try {
-                await whatsappService.sendMessage(r.paciente_telefone, r.mensagem || 'Lembrete');
-                await db.execute(
-                    "UPDATE lembretes SET status = 'enviado', data_envio_real = NOW() WHERE id = ?",
-                    [r.id]
-                );
-            } catch (sendErr) {
-                const attempts = Number(r.tentativas || 0) + 1;
-                const errMsg = sendErr && sendErr.message ? String(sendErr.message).slice(0, 250) : 'Erro ao enviar';
-                console.error('Falha ao enviar lembrete WhatsApp:', r.id, errMsg, `tentativa ${attempts}/${maxAttempts}`);
+            // Enviar Email
+            if (r.via_email && transporter && r.paciente_email) {
+                try {
+                    const emailTemplate = await gerarTemplateEmailLembrete(r);
+                    const cfgFrom = await getAppConfigValue(db, 'SMTP_FROM');
+                    const from = (cfgFrom != null && String(cfgFrom).trim())
+                        ? String(cfgFrom).trim()
+                        : (process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.SMTP_USER || 'no-reply@localhost').toString();
 
+                    await transporter.sendMail({
+                        from,
+                        to: r.paciente_email,
+                        subject: '🏥 Clínica Andreia Ballejo - Lembrete de Consulta',
+                        text: emailTemplate.text,
+                        html: emailTemplate.html
+                    });
+
+                    console.log('✅ Email de lembrete enviado para:', r.paciente_email);
+                    emailEnviado = true;
+
+                    // Se já não foi enviado por WhatsApp, atualiza status
+                    if (!whatsappEnviado) {
+                        await db.execute(
+                            "UPDATE lembretes SET status = 'enviado', data_envio_real = NOW() WHERE id = ?",
+                            [r.id]
+                        );
+                    }
+                } catch (emailErr) {
+                    const attempts = Number(r.tentativas || 0) + 1;
+                    const errMsg = emailErr && emailErr.message ? String(emailErr.message).slice(0, 250) : 'Erro ao enviar email';
+                    console.error('Falha ao enviar lembrete Email:', r.id, errMsg, `tentativa ${attempts}/${maxAttempts}`);
+                }
+            }
+
+            // Se nenhum foi enviado, trata como erro
+            if (!whatsappEnviado && !emailEnviado) {
+                const attempts = Number(r.tentativas || 0) + 1;
+                const errMsg = 'Nenhum canal disponível para envio';
+                
                 if (attempts >= maxAttempts) {
                     await db.execute(
                         "UPDATE lembretes SET status = 'erro', data_envio_real = NOW(), tentativas = ?, ultimo_erro = ? WHERE id = ?",
@@ -595,6 +635,73 @@ async function processarLembretesPendentes() {
     } catch (error) {
         console.error('Erro no processamento de lembretes:', error);
     }
+}
+
+async function gerarTemplateEmailLembrete(lembrete) {
+    const dataConsulta = lembrete.data_hora ? new Date(lembrete.data_hora) : null;
+    const dataFormatada = dataConsulta ? dataConsulta.toLocaleDateString('pt-BR') : 'A definir';
+    const horaFormatada = dataConsulta ? dataConsulta.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'A definir';
+    
+    const text = `🏥 Clínica Andreia Ballejo - Lembrete de Consulta
+
+Olá ${lembrete.paciente_nome}! 😊
+
+📅 Data: ${dataFormatada}
+🕒 Horário: ${horaFormatada}
+👨‍⚕️ Profissional: ${lembrete.profissional_nome || 'A definir'}
+🏷️ Tipo: ${lembrete.tipo_consulta || 'consulta'}
+
+⏰ Recomendação: chegue 15 minutos antes para recepção e preparo.
+🪪 Traga: documento com foto e, se tiver, cartão do convênio/guia.
+
+✅ Por favor, confirme sua presença respondendo esta mensagem.
+🔁 Se precisar remarcar/cancelar, avise com antecedência.
+
+Até lá!`;
+
+    const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 28px;">🏥 Clínica Andreia Ballejo</h1>
+            <p style="margin: 10px 0 0 0; font-size: 18px; opacity: 0.9;">Lembrete de Consulta</p>
+        </div>
+        
+        <div style="background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; margin-top: 0;">Olá ${lembrete.paciente_nome}! 😊</h2>
+            
+            <div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+                <h3 style="margin-top: 0; color: #0056b3;">📅 Detalhes da Consulta</h3>
+                <p style="margin: 8px 0; font-size: 16px;"><strong>Data:</strong> ${dataFormatada}</p>
+                <p style="margin: 8px 0; font-size: 16px;"><strong>Horário:</strong> ${horaFormatada}</p>
+                <p style="margin: 8px 0; font-size: 16px;"><strong>Profissional:</strong> ${lembrete.profissional_nome || 'A definir'}</p>
+                <p style="margin: 8px 0; font-size: 16px;"><strong>Tipo:</strong> ${lembrete.tipo_consulta || 'consulta'}</p>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                <h3 style="margin-top: 0; color: #856404;">⏰ Recomendações</h3>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li style="margin: 8px 0;">Chegue 15 minutos antes para recepção e preparo</li>
+                    <li style="margin: 8px 0;">Traga documento com foto</li>
+                    <li style="margin: 8px 0;">Se tiver, cartão do convênio/guia</li>
+                </ul>
+            </div>
+            
+            <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+                <h3 style="margin-top: 0; color: #155724;">✅ Próximos Passos</h3>
+                <p style="margin: 8px 0;">Por favor, confirme sua presença respondendo esta mensagem.</p>
+                <p style="margin: 8px 0;">Se precisar remarcar/cancelar, avise com antecedência.</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                <p style="margin: 0; color: #666; font-size: 14px;">Até lá!</p>
+                <p style="margin: 10px 0 0 0; color: #666; font-size: 12px;">
+                    Clínica Andreia Ballejo | Saúde e bem-estar
+                </p>
+            </div>
+        </div>
+    </div>`;
+
+    return { text, html };
 }
 
 async function criarLembretesAniversarioInternos() {
