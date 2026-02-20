@@ -233,33 +233,55 @@ async function notifyBlockedAccessAttemptWhatsapp(db, colaborador, motivo) {
 }
 
 async function getMailerTransporterFromConfig(db) {
-    const cfgHost = await getAppConfigValue(db, 'SMTP_HOST');
-    const cfgPort = await getAppConfigValue(db, 'SMTP_PORT');
-    const cfgUser = await getAppConfigValue(db, 'SMTP_USER');
-    const cfgPass = await getAppConfigValue(db, 'SMTP_PASS');
-    const cfgSecure = await getAppConfigValue(db, 'SMTP_SECURE');
-
-    const envHost = (process.env.SMTP_HOST || '').toString().trim();
-    const envPort = process.env.SMTP_PORT;
+    // Priorizar variáveis de ambiente
+    const envHost = (process.env.EMAIL_HOST || process.env.SMTP_HOST || '').toString().trim();
+    const envPort = process.env.EMAIL_PORT || process.env.SMTP_PORT || 587;
     const envUser = (process.env.EMAIL_USER || process.env.SMTP_USER || '').toString().trim();
     const envPass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').toString();
-    const envSecureRaw = (process.env.SMTP_SECURE || '');
+    const envSecureRaw = (process.env.EMAIL_SECURE || process.env.SMTP_SECURE || '');
+    const envSecure = String(envSecureRaw).toLowerCase() === 'true' || String(envSecureRaw) === '1';
 
-    const host = envHost ? envHost : ((cfgHost != null && String(cfgHost).trim()) ? String(cfgHost).trim() : '');
-    const port = Number((envPort != null && String(envPort).trim()) ? String(envPort).trim() : ((cfgPort != null && String(cfgPort).trim()) ? String(cfgPort).trim() : 587));
-    const user = envUser ? envUser : ((cfgUser != null && String(cfgUser).trim()) ? String(cfgUser).trim() : '');
-    const pass = envPass ? envPass : ((cfgPass != null && String(cfgPass)) ? String(cfgPass) : '');
-    const secureRaw = (envSecureRaw != null && String(envSecureRaw).trim() !== '') ? String(envSecureRaw).trim() : ((cfgSecure != null && String(cfgSecure).trim() !== '') ? String(cfgSecure).trim() : '');
-    const secure = String(secureRaw).toLowerCase() === 'true' || String(secureRaw) === '1';
+    // Se variáveis de ambiente estiverem configuradas, usar elas
+    if (envHost && envUser && envPass) {
+        console.log('✅ Usando SMTP das variáveis de ambiente:', { host: envHost, user: envUser });
+        return nodemailer.createTransport({
+            host: envHost,
+            port: Number(envPort),
+            secure: envSecure,
+            auth: { user: envUser, pass: envPass }
+        });
+    }
 
-    if (!host || !user || !pass) return null;
+    // Fallback: tentar configurações do banco (só se não tiver env)
+    try {
+        const cfgHost = await getAppConfigValue(db, 'SMTP_HOST');
+        const cfgPort = await getAppConfigValue(db, 'SMTP_PORT');
+        const cfgUser = await getAppConfigValue(db, 'SMTP_USER');
+        const cfgPass = await getAppConfigValue(db, 'SMTP_PASS');
+        const cfgSecure = await getAppConfigValue(db, 'SMTP_SECURE');
 
-    return nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: { user, pass }
-    });
+        const host = (cfgHost != null && String(cfgHost).trim()) ? String(cfgHost).trim() : '';
+        const port = Number((cfgPort != null && String(cfgPort).trim()) ? String(cfgPort).trim() : 587);
+        const user = (cfgUser != null && String(cfgUser).trim()) ? String(cfgUser).trim() : '';
+        const pass = (cfgPass != null && String(cfgPass)) ? String(cfgPass) : '';
+        const secureRaw = (cfgSecure != null && String(cfgSecure).trim() !== '') ? String(cfgSecure).trim() : '';
+        const secure = String(secureRaw).toLowerCase() === 'true' || String(secureRaw) === '1';
+
+        if (host && user && pass) {
+            console.log('✅ Usando SMTP do banco de dados:', { host, user });
+            return nodemailer.createTransport({
+                host,
+                port,
+                secure,
+                auth: { user, pass }
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao ler SMTP do banco:', error);
+    }
+
+    console.log('❌ SMTP não configurado em nenhum lugar');
+    return null;
 }
 
 // WhatsApp Service
