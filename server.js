@@ -1387,7 +1387,15 @@ app.get('/forgot-password', (req, res) => {
     } catch (e) {
         // ignore
     }
-    res.render('forgot-password', { error: null, info: null, usuario: null, currentPage: '' });
+    res.render('forgot-password', { 
+        error: null, 
+        info: null, 
+        usuario: null, 
+        currentPage: '',
+        showTargetEmail: false,
+        adminEmail: null,
+        adminName: null
+    });
 });
 
 app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
