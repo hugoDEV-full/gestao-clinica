@@ -235,20 +235,33 @@ async function notifyBlockedAccessAttemptWhatsapp(db, colaborador, motivo) {
 async function getMailerTransporterFromConfig(db) {
     // Priorizar variáveis de ambiente
     const envHost = (process.env.EMAIL_HOST || process.env.SMTP_HOST || '').toString().trim();
-    const envPort = process.env.EMAIL_PORT || process.env.SMTP_PORT || 587;
+    // Forçar porta 465 para Railway (SSL funciona melhor)
+    const envPort = process.env.EMAIL_PORT || process.env.SMTP_PORT || 465;
     const envUser = (process.env.EMAIL_USER || process.env.SMTP_USER || '').toString().trim();
     const envPass = (process.env.EMAIL_PASS || process.env.SMTP_PASS || '').toString();
-    const envSecureRaw = (process.env.EMAIL_SECURE || process.env.SMTP_SECURE || '');
-    const envSecure = String(envSecureRaw).toLowerCase() === 'true' || String(envSecureRaw) === '1';
+    // Forçar secure=true para porta 465
+    const envSecure = Number(envPort) === 465 ? true : (
+        String(process.env.EMAIL_SECURE || process.env.SMTP_SECURE || '').toLowerCase() === 'true' || 
+        String(process.env.EMAIL_SECURE || process.env.SMTP_SECURE || '') === '1'
+    );
 
     // Se variáveis de ambiente estiverem configuradas, usar elas
     if (envHost && envUser && envPass) {
-        console.log('✅ Usando SMTP das variáveis de ambiente:', { host: envHost, user: envUser });
+        console.log('✅ Usando SMTP das variáveis de ambiente:', { 
+            host: envHost, 
+            port: envPort, 
+            user: envUser,
+            secure: envSecure
+        });
         return nodemailer.createTransport({
             host: envHost,
             port: Number(envPort),
             secure: envSecure,
-            auth: { user: envUser, pass: envPass }
+            auth: { user: envUser, pass: envPass },
+            // Timeout maior para Railway
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 10000
         });
     }
 
@@ -261,19 +274,24 @@ async function getMailerTransporterFromConfig(db) {
         const cfgSecure = await getAppConfigValue(db, 'SMTP_SECURE');
 
         const host = (cfgHost != null && String(cfgHost).trim()) ? String(cfgHost).trim() : '';
-        const port = Number((cfgPort != null && String(cfgPort).trim()) ? String(cfgPort).trim() : 587);
+        const port = Number((cfgPort != null && String(cfgPort).trim()) ? String(cfgPort).trim() : 465);
         const user = (cfgUser != null && String(cfgUser).trim()) ? String(cfgUser).trim() : '';
         const pass = (cfgPass != null && String(cfgPass)) ? String(cfgPass) : '';
-        const secureRaw = (cfgSecure != null && String(cfgSecure).trim() !== '') ? String(cfgSecure).trim() : '';
-        const secure = String(secureRaw).toLowerCase() === 'true' || String(secureRaw) === '1';
+        const secure = Number(port) === 465 ? true : (
+            (cfgSecure != null && String(cfgSecure).trim() !== '') ? 
+            String(cfgSecure).trim().toLowerCase() === 'true' || String(cfgSecure).trim() === '1' : false
+        );
 
         if (host && user && pass) {
-            console.log('✅ Usando SMTP do banco de dados:', { host, user });
+            console.log('✅ Usando SMTP do banco de dados:', { host, port, user, secure });
             return nodemailer.createTransport({
                 host,
                 port,
                 secure,
-                auth: { user, pass }
+                auth: { user, pass },
+                connectionTimeout: 10000,
+                greetingTimeout: 10000,
+                socketTimeout: 10000
             });
         }
     } catch (error) {
